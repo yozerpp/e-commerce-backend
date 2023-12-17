@@ -1,0 +1,21 @@
+<Context>
+    <Resource type="javax.sql.DataSource"
+              name="jdbc/pool/test"
+              auth="Container"
+              jdbcInterceptors="ConnectionState;StatementFinalizer;StatementCache(callable=true)"
+              initialSize="5"
+              validationInterval="5000"
+              testOnBorrow="true"
+              validationQuery="SELECT 1"
+              removeAbandoned="true"
+              defaultTransactionIsolation="READ_COMMITTED"
+              factory="org.apache.tomcat.jdbc.pool.DataSourceFactory"
+              driverClassName="com.mysql.cj.jdbc.Driver"
+              url="jdbc:mysql://localhost:3306/test"
+              username="root"
+              password="Yusuf_2002"
+    />
+    <Resource type="org.apache.logging.log4j.Logger"
+              name ="log/log4j"
+              factory="org.apache.logging.log4j.LogManager"/>
+</Context>
