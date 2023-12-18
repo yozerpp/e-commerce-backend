@@ -7,7 +7,7 @@
               validationInterval="5000"
               testOnBorrow="true"
               validationQuery="SELECT 1"
-              removeAbandoned="true"
+              removeAbandoned="false"
               defaultTransactionIsolation="READ_COMMITTED"
               factory="org.apache.tomcat.jdbc.pool.DataSourceFactory"
               driverClassName="com.mysql.cj.jdbc.Driver"
@@ -15,7 +15,4 @@
               username="root"
               password="Yusuf_2002"
     />
-    <Resource type="org.apache.logging.log4j.Logger"
-              name ="log/log4j"
-              factory="org.apache.logging.log4j.LogManager"/>
 </Context>

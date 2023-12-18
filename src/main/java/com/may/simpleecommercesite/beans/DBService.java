@@ -1,125 +1,151 @@
 package com.may.simpleecommercesite.beans;
 
-import javax.annotation.PostConstruct;
-import javax.enterprise.context.Dependent;
-import javax.inject.Inject;
-import javax.json.*;
-import javax.swing.*;
-import java.io.Serializable;
-import java.sql.*;
-import java.util.Base64;
-import java.util.function.Consumer;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
-@Dependent
-public class DBService implements Serializable {
-    @Inject
-    private WrappedConnection wcon;
-    private Connection con;
-    @Inject
+
+import javax.sql.DataSource;
+import javax.sql.RowSet;
+import javax.sql.rowset.CachedRowSet;
+import javax.sql.rowset.JoinRowSet;
+import javax.sql.rowset.RowSetProvider;
+
+import java.io.Serializable;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+
+public class DBService implements Serializable{
+    DataSource dataSource;
+    private Connection connection;
     SqlLogger logger;
     public DBService(){}
-    @PostConstruct
-    void setConnection(){
-        con=wcon.getrealConnection();
+    public DBService(DataSource ds, String username, String password) throws SQLException {
+        this.dataSource=ds;
+        connection=dataSource.getConnection(username,password);
+        this.logger=new SqlLogger();
     }
-    JsonObject userByEmailCredential(String email, String password){
-        JsonObject user=null;
-        try(PreparedStatement statement = con.prepareStatement(userQuery)) {
-            statement.setString(1, email);
-            statement.setString(2, password);
-            ResultSet rs= statement.executeQuery();
-            if (rs.next()){
-                user= Json.createObjectBuilder().add("cookieId", rs.getInt(1))
-                        .add("email", rs.getString(2))
-                        .add("credential", rs.getString(3))
-                        .add("firstName", rs.getString(4))
-                        .add("lastName", rs.getString(5))
-                        .add("city", rs.getString(6))
-                        .add("district", rs.getString(7))
-                        .add("street", rs.getString(8))
-                        .add("buildingNo", rs.getString(9))
-                        .add("buildingName", rs.getString(10))
-                        .add("innerDoorNo", rs.getInt(11))
-                        .add("additional", rs.getInt(12)).build();
-            }
-        } catch (SQLException e) {
+
+    public CachedRowSet userByEmailCredential(String email, String password) {
+        CachedRowSet user=null;
+        try {
+            user=newCachedRowset();
+            user.setCommand(userQuery);
+            user.setString(1, email);
+            user.setString(2, password);
+            user.execute(connection);
+        } catch (SQLException e){
             logger.log(SqlLogger.SqlMethodType.QUERY, e);
         }
         return user;
     }
-    void editUserByEmailCredential(Consumer<ResultSet> consumer, String email, String password) throws SQLException{
-        con.setAutoCommit(false);
-        try(PreparedStatement statement = con.prepareStatement(userQuery,
-                ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE)){
-            statement.setString(1, email);
-            statement.setString(2, password);
-            consumer.accept(statement.executeQuery());
-            con.commit();
+    public RowSet cartById(int cartId)  {
+        CachedRowSet product = null;
+        CachedRowSet sale=null;
+        CachedRowSet cart=null;
+        JoinRowSet jrs=null;
+            int cartTotal = 0;
+        try (PreparedStatement statement= connection.prepareStatement("SELECT c.cartId, c.total, c.ordered, quantity, totalPrice, p.basePrice, p.baseDiscount, coalesce(co.discount,0), p.productId, p.title, p.discountedPrice FROM cart c join sale s on c.cartId=s.cartId join product p on p.productId=s.productId left outer join coupon co on s.couponCode=co.couponCode WHERE s.cartId=?", ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE)){
+            cart=newCachedRowset();
+            cart.setCommand("SELECT cartId, total, ordered FROM cart WHERE cartId=?");
+            cart.setInt(1, 2);
+            cart.setMatchColumn(1);
+            cart.execute(connection);
+            sale=newCachedRowset();
+            sale.setCommand("SELECT cartId, productId, quantity, couponCode, totalPrice FROM sale WHERE cartId=?");
+            sale.setInt(1, 2);
+            sale.setMatchColumn(1);
+            sale.execute(connection);
+            jrs=newJoinRowset();
+            jrs.addRowSet(new CachedRowSet[]{cart, sale}, new int[]{1, 1});
+            CachedRowSet crs= jrs.toCachedRowSet();
+            crs.next();
+            int a= crs.getInt("quantity");
+            CachedRowSet rs=newCachedRowset();
+            rs.setCommand("SELECT * FROM sale WHERE cartId=2 AND quantity=4");
+            rs.execute(connection);
+            rs.next();
+            connection.setAutoCommit(false);
+            crs.updateInt("quantity", 7);
+            crs.acceptChanges(connection);
+            crs.commit();
+            rs.updateInt("quantity", 9);
+            //doesnt work
+            rs.acceptChanges(connection);
+            rs.commit();
+
+            Statement stmt=connection.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE ,ResultSet.CONCUR_UPDATABLE);
+            ResultSet as= stmt.executeQuery("SELECT * FROM sale WHERE cartId=2 AND quantity=3");
+            as.next();
+            int c= as.getInt("quantity");
+            //works
+            as.updateInt("quantity", 8);
+            as.updateRow();
+            connection.commit();
+            connection.setAutoCommit(true);
+            int b=crs.getInt("quantity");
+            logger.log(SqlLogger.SqlMethodType.INSERT, new SQLException("sample"));
         } catch (SQLException e){
-            con.rollback();
-            logger.log(SqlLogger.SqlMethodType.UPDATE,e);
-            throw e;
-        }finally {
-            con.setAutoCommit(true);
+            logger.log(SqlLogger.SqlMethodType.QUERY, e);
         }
+        return jrs;
     }
-    JsonObject cartById(int cartId) {
-        JsonObject cart=null;
-        JsonArrayBuilder sales=Json.createArrayBuilder();
-        int cartTotal = 0;
-        try (PreparedStatement table = con.prepareStatement(createTempCart);
-            Statement select =con.createStatement();
-            Statement drop=con.createStatement()){
-            table.setInt(1, cartId);
-            table.executeQuery();
-            ResultSet rs= select.executeQuery(selectCart);
-            while (rs.next()){
-                sales.add(Json.createObjectBuilder()
-                        .add("productId", rs.getInt("productId"))
-                        // TODO Perform image encoding in a different thread?
-                        .add("image", Base64.getEncoder().encodeToString(rs.getBytes("image")))
-                        .add("title", rs.getString("title"))
-                        .add("basePrice", rs.getDouble("basePrice"))
-                        .add("baseDiscount", rs.getDouble("baseDiscount"))
-                        .add("discountedPrice", rs.getDouble("discountedPrice"))
-                        .add("couponCode", rs.getString("couponCode"))
-                        .add("couponDiscount", rs.getDouble("couponDiscount"))
-                        .add("quantity", rs.getInt("quantity"))
-                        .add("saleTotal", rs.getDouble("saleTotal"))
-                        .build());
-                cartTotal=rs.getInt("cartTotal");
-            }
-            cart=Json.createObjectBuilder().add("cartTotal", cartTotal)
-                    .add("sales", sales).build();
-            drop.execute("drop temporary table IF EXISTS customerCart");
+    public int insertSale(int cartId, int productId, int quantity, String couponCode){
+        int count = 0;
+        try (PreparedStatement statement=connection.prepareStatement("INSERT INTO sale (cartId, productId, quantity, couponCode) values(?,?,?,?)")){
+            statement.setInt(1, cartId);
+            statement.setInt(2, productId);
+            statement.setInt(3, quantity);
+            statement.setString(4, couponCode);
+            count= statement.executeUpdate();
+        } catch (SQLException e){
+            logger.log(SqlLogger.SqlMethodType.INSERT, e);
+        }
+        return count;
+    }
+    public int newCart(){
+        int cartId=0;
+        try (Statement statement=connection.createStatement();
+            Statement id=connection.createStatement()){
+            int count =statement.executeUpdate("INSERT INTO cart values ()");
+            ResultSet rs= id.executeQuery("SELECT LAST_INSERT_ID() FROM cart");
+            rs.next();
+            cartId= Integer.parseInt(rs.getString(1));
         } catch (SQLException e) {
-            logger.log(SqlLogger.SqlMethodType.DDL, e);
+            logger.log(SqlLogger.SqlMethodType.INSERT, e);
         }
-        return cart;
+    return cartId;
     }
-    void editCartById(Consumer<ResultSet> consumer, int cartId){
-
-        try (PreparedStatement table = con.prepareStatement(createTempCart);
-             Statement select =con.createStatement();
-             Statement drop=con.createStatement()){
-            table.setInt(1, cartId);
-            ResultSet rs=select.executeQuery(selectCart);
-
-        } catch (SQLException e){
-            try {
-                con.rollback();
-            } catch (Exception ignored){}
-            logger.log(SqlLogger.SqlMethodType.UPDATE, e);
-        }
+    public CachedRowSet newCachedRowset() throws SQLException{
+        CachedRowSet rs=RowSetProvider.newFactory().createCachedRowSet();
+        rs.setUrl(connectparams[0]);
+        rs.setUsername(connectparams[1]);
+        rs.setPassword(connectparams[2]);
+        return rs;
+    }
+    public JoinRowSet newJoinRowset() throws SQLException{
+        JoinRowSet rs=RowSetProvider.newFactory().createJoinRowSet();
+        rs.setUrl(connectparams[0]);
+        rs.setUsername(connectparams[1]);
+        rs.setPassword(connectparams[2]);
+        return rs;
     }
     public Connection getCon() {
-        return con;
+        return connection;
+    }
+    Connection validateAndGetConnection() throws SQLException{
+        if(!this.connection.isValid(0)){
+            this.connection=this.dataSource.getConnection();
+        }
+        return this.connection;
     }
 
-    public void setCon(Connection con) {
-        this.con = con;
+    public void setCon(Connection connection) {
+        this.connection = connection;
     }
-    private static final String userQuery="SELECT cookieId, email, credential, firstName, lastName," +
+    private static final String userQuery="SELECT cookieId, cartId, r.email, credential, firstName, lastName," +
             " city, district, street, buildingNo, coalesce(buildingName,''), innerDoorNo, coalesce(additional, '') " +
             "FROM registeredcustomer r join address a ON r.email=a.email WHERE r.email=? AND credential=?";
     private static final String createTempCart="CREATE temporary table customerCart " +
@@ -128,5 +154,5 @@ public class DBService implements Serializable {
     private static final String selectCart="SELECT  p.productId, p.image, p.title, p.basePrice, p.baseDiscount, p.discountedPrice, " +
             "c.couponCode, coalesce(c.discount, 0) AS couponDiscount, cc.quantity, cc.saleTotal, cc.cartTotal FROM customerCart cc " +
             "join product p ON cc.productId=p.productId LEFT OUTER JOIN coupon c ON cc.couponCode=c.couponCode";
-
+    private static final String[] connectparams={"jdbc:mysql://localhost:3306/test", "root", "Yusuf_2002"};
 }
