@@ -1,15 +1,28 @@
 package com.may.simpleecommercesite.apiServlets;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
+import com.may.simpleecommercesite.annotations.Id;
+import com.may.simpleecommercesite.beans.DBService;
+import com.may.simpleecommercesite.entities.Entity;
+import com.may.simpleecommercesite.entities.Sale;
+import com.may.simpleecommercesite.helpers.ErrandBoy;
 
-public class BaseApiServlet extends HttpServlet {
+import javax.annotation.Resource;
+import javax.servlet.ServletException;
+import javax.servlet.http.*;
+import javax.sql.DataSource;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+public class ApiServlet extends HttpServlet {
+    @Resource(name = "java:comp/env/jdbc/pool/test")
+    DataSource dataSource;
     int activeRequest;
     boolean destroying;
-
     @Override
     public void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         if (destroying) {

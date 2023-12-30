@@ -1,20 +1,25 @@
 package com.may.simpleecommercesite.beans;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-
+import com.fasterxml.jackson.core.JsonFactory;
+import com.may.simpleecommercesite.annotations.Id;
+import com.may.simpleecommercesite.entities.Entity;
+import com.may.simpleecommercesite.entities.Product;
+import com.may.simpleecommercesite.helpers.ErrandBoy;
+import org.apache.commons.lang.StringEscapeUtils;
+import org.owasp.esapi.ESAPI;
+import org.owasp.esapi.codecs.MySQLCodec;
+import org.owasp.esapi.configuration.consts.EsapiConfiguration;
 
 import javax.sql.DataSource;
-import javax.sql.RowSet;
-import javax.sql.rowset.CachedRowSet;
-import javax.sql.rowset.JoinRowSet;
-import javax.sql.rowset.RowSetProvider;
-
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
-
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 
 public class DBService implements Serializable{
@@ -22,117 +27,149 @@ public class DBService implements Serializable{
     private Connection connection;
     SqlLogger logger;
     public DBService(){}
-    public DBService(DataSource ds, String username, String password) throws SQLException {
+    public DBService(DataSource ds) {
         this.dataSource=ds;
-        connection=dataSource.getConnection(username,password);
+        try {
+            connection=dataSource.getConnection(connectparams[1], connectparams[2]);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
         this.logger=new SqlLogger();
     }
-
-    public CachedRowSet userByEmailCredential(String email, String password) {
-        CachedRowSet user=null;
-        try {
-            user=newCachedRowset();
-            user.setCommand(userQuery);
-            user.setString(1, email);
-            user.setString(2, password);
-            user.execute(connection);
-        } catch (SQLException e){
-            logger.log(SqlLogger.SqlMethodType.QUERY, e);
-        }
-        return user;
+    public void destroy() {
+        try{
+        connection.close();
+        } catch (SQLException ignored){}
     }
-    public RowSet cartById(int cartId)  {
-        CachedRowSet product = null;
-        CachedRowSet sale=null;
-        CachedRowSet cart=null;
-        JoinRowSet jrs=null;
-            int cartTotal = 0;
-        try (PreparedStatement statement= connection.prepareStatement("SELECT c.cartId, c.total, c.ordered, quantity, totalPrice, p.basePrice, p.baseDiscount, coalesce(co.discount,0), p.productId, p.title, p.discountedPrice FROM cart c join sale s on c.cartId=s.cartId join product p on p.productId=s.productId left outer join coupon co on s.couponCode=co.couponCode WHERE s.cartId=?", ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE)){
-            cart=newCachedRowset();
-            cart.setCommand("SELECT cartId, total, ordered FROM cart WHERE cartId=?");
-            cart.setInt(1, 2);
-            cart.setMatchColumn(1);
-            cart.execute(connection);
-            sale=newCachedRowset();
-            sale.setCommand("SELECT cartId, productId, quantity, couponCode, totalPrice FROM sale WHERE cartId=?");
-            sale.setInt(1, 2);
-            sale.setMatchColumn(1);
-            sale.execute(connection);
-            jrs=newJoinRowset();
-            jrs.addRowSet(new CachedRowSet[]{cart, sale}, new int[]{1, 1});
-            CachedRowSet crs= jrs.toCachedRowSet();
-            crs.next();
-            int a= crs.getInt("quantity");
-            CachedRowSet rs=newCachedRowset();
-            rs.setCommand("SELECT * FROM sale WHERE cartId=2 AND quantity=4");
-            rs.execute(connection);
-            rs.next();
-            connection.setAutoCommit(false);
-            crs.updateInt("quantity", 7);
-            crs.acceptChanges(connection);
-            crs.commit();
-            rs.updateInt("quantity", 9);
-            //doesnt work
-            rs.acceptChanges(connection);
-            rs.commit();
-
-            Statement stmt=connection.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE ,ResultSet.CONCUR_UPDATABLE);
-            ResultSet as= stmt.executeQuery("SELECT * FROM sale WHERE cartId=2 AND quantity=3");
-            as.next();
-            int c= as.getInt("quantity");
-            //works
-            as.updateInt("quantity", 8);
-            as.updateRow();
-            connection.commit();
-            connection.setAutoCommit(true);
-            int b=crs.getInt("quantity");
-            logger.log(SqlLogger.SqlMethodType.INSERT, new SQLException("sample"));
-        } catch (SQLException e){
-            logger.log(SqlLogger.SqlMethodType.QUERY, e);
-        }
-        return jrs;
-    }
-    public int insertSale(int cartId, int productId, int quantity, String couponCode){
-        int count = 0;
-        try (PreparedStatement statement=connection.prepareStatement("INSERT INTO sale (cartId, productId, quantity, couponCode) values(?,?,?,?)")){
-            statement.setInt(1, cartId);
-            statement.setInt(2, productId);
-            statement.setInt(3, quantity);
-            statement.setString(4, couponCode);
-            count= statement.executeUpdate();
-        } catch (SQLException e){
-            logger.log(SqlLogger.SqlMethodType.INSERT, e);
-        }
-        return count;
-    }
-    public int newCart(){
-        int cartId=0;
-        try (Statement statement=connection.createStatement();
-            Statement id=connection.createStatement()){
-            int count =statement.executeUpdate("INSERT INTO cart values ()");
-            ResultSet rs= id.executeQuery("SELECT LAST_INSERT_ID() FROM cart");
-            rs.next();
-            cartId= Integer.parseInt(rs.getString(1));
+    public Map.Entry<String, Object> newEntity(Class<?> entity){
+        Object insertId=null;
+        String sql=createStatementString(entity.getSimpleName() ,null, StatementType.INSERT);
+        String pkFieldName=Entity.getAnnotatedFields(entity, Id.class).get(0).getName();
+        try (Statement statement=connection.createStatement()){
+            statement.executeUpdate(sql, new String[]{pkFieldName});
+            ResultSet rs= statement.getGeneratedKeys();
+            if(rs.next()) {
+                insertId = rs.getInt(1);
+            }
         } catch (SQLException e) {
             logger.log(SqlLogger.SqlMethodType.INSERT, e);
         }
-    return cartId;
+        return Map.of(pkFieldName, insertId).entrySet().stream().findFirst().get();
     }
-    public CachedRowSet newCachedRowset() throws SQLException{
-        CachedRowSet rs=RowSetProvider.newFactory().createCachedRowSet();
-        rs.setUrl(connectparams[0]);
-        rs.setUsername(connectparams[1]);
-        rs.setPassword(connectparams[2]);
-        return rs;
+    public List<?> byFields(Class<?> clazz, Map<String, Object> params, boolean fetchLob) {
+        List<Entity> entities = new ArrayList<>();
+        try (Statement statement=connection.createStatement()){
+            Object pk = null;
+            String pkFieldName=null;
+            Class<?> pkType = null;
+//            statement.getClass().getDeclaredMethod("set"+ pkTypeName, int.class, pkType).invoke(statement,1, pk.getClass().equals(Integer.class)?((Integer) pk).intValue():pk);
+            ResultSet rs=statement.executeQuery(createStatementString(clazz.getSimpleName(), params, StatementType.QUERY));
+            while(rs.next()){
+                Object entity= EntityFactory.class.getDeclaredMethod(clazz.getSimpleName().toLowerCase()).invoke(null);
+                for (Field field: clazz.getDeclaredFields()) {
+                    if (field.getName().endsWith("Dirty")) continue;
+                    Object val = null;
+                    String fieldName=field.getName();
+                    String fieldTypeName=field.getType().getSimpleName();
+                    if(byte[].class.isAssignableFrom(field.getType())) {
+                        if(fetchLob){
+                            Blob locator = rs.getBlob(fieldName);
+                            if (locator != null) {
+                                InputStream in = locator.getBinaryStream();
+                                byte[] buf = new byte[Math.toIntExact(locator.length())];
+                                in.read(buf);
+                                in.close();
+                                locator.free();
+                                val=buf;
+                            }
+                        }
+                    } else if (Entity.class.isAssignableFrom(field.getType())){
+                        Class<?> subEntitypkType= Entity.getBasePrimaryKeyType((Class<? extends Entity>) field.getType());
+                        Object subEntityPk= rs.getClass().getDeclaredMethod("get"+ ErrandBoy.firstLetterToUpperCase(subEntitypkType.getSimpleName()), String.class).invoke(rs, fieldName);
+                        if (subEntityPk !=null) val =EntityFactory.class.getDeclaredMethod(fieldTypeName.toLowerCase(), subEntitypkType).invoke(null, subEntityPk);
+                    } else {
+                        val=rs.getClass().getDeclaredMethod("get" + ErrandBoy.firstLetterToUpperCase(fieldTypeName), String.class).invoke(rs, fieldName);
+                    }
+                    if (val!=null) entity.getClass().getDeclaredMethod("set" + ErrandBoy.firstLetterToUpperCase(fieldName), field.getType()).invoke(entity, val.getClass().equals(Integer.class)?((Integer) val).intValue():val);
+                }
+                ((Entity) entity).clean();
+                entities.add((Entity) entity);
+            }
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException | IllegalArgumentException |
+                 IOException | SQLException e){
+            throw new RuntimeException(e);
+        }
+        return entities;
     }
-    public JoinRowSet newJoinRowset() throws SQLException{
-        JoinRowSet rs=RowSetProvider.newFactory().createJoinRowSet();
-        rs.setUrl(connectparams[0]);
-        rs.setUsername(connectparams[1]);
-        rs.setPassword(connectparams[2]);
-        return rs;
+    public static String createStatementString(String table, Map<String, Object> params, StatementType type){
+        StringBuilder firstParam = new StringBuilder();
+        StringBuilder lastParam = new StringBuilder();
+        int size=20;
+        int page=0;
+        String command = null;
+        String separator = type==StatementType.INSERT | type==StatementType.UPDATE ? ", " : " AND ";
+        boolean firstRun=true;
+        if (params!=null)
+            for (Map.Entry<String, Object> param: params.entrySet()){
+                Object value;
+                if((value=param.getValue())==null) continue;
+                boolean fEmpty=firstParam.isEmpty();
+                boolean lEmpty=lastParam.isEmpty();
+                if(!fEmpty) firstParam.append(separator);
+                if (type==StatementType.UPDATE){
+                        if(lEmpty) lastParam.append(param.getKey()).append("=").append(param.getValue().toString());
+                        else {
+                            if(fEmpty) firstParam.append("SET ");
+                            firstParam.append(param.getKey()).append("=").append(param.getValue());
+                        }
+                    } else {
+                        if(!lEmpty) lastParam.append(separator);
+                        if (type == StatementType.INSERT) firstParam.append(param.getKey());
+                        else {
+                            String key = param.getKey();
+                            if (key.equals("size")) size = Integer.parseInt((String) value);
+                            else if (key.equals("page")) page = Integer.parseInt((String) value);
+                            else {
+                                lastParam.append(key);
+                                if (key.endsWith("High")) lastParam.append("<");
+                                else if (key.endsWith("Low")) lastParam.append(">");
+                                else lastParam.append("=");
+                            }
+                        }
+                            if (value instanceof String | value instanceof Timestamp) lastParam.append("\"").append(value).append("\"");
+                            else lastParam.append(value);
+                    }
+          }
+        switch (type){
+            case INSERT:
+                firstParam=new StringBuilder("(").append(firstParam).append(")");
+                lastParam=new StringBuilder("VALUES(").append(lastParam).append(")");
+                command="INSERT INTO ";
+                break;
+            case QUERY:
+                if (!lastParam.isEmpty()) lastParam=new StringBuilder("WHERE ").append(lastParam);
+                lastParam.append(" LIMIT ").append(page*size).append(",").append(size);
+                command="SELECT * FROM ";
+                break;
+            case DELETE:
+                if (!lastParam.isEmpty()) lastParam=new StringBuilder("WHERE ").append(lastParam);
+                command="DELETE FROM ";
+                break;
+            case UPDATE:
+                lastParam=new StringBuilder(" WHERE ").append(lastParam);
+                command="UPDATE ";
+        }
+        String sql=new StringBuilder(command).append(table).append(" ").append(firstParam).append(lastParam).toString();
+        // useless. Find alternatives.
+        return StringEscapeUtils.escapeSql( sql);
     }
-    public Connection getCon() {
+    public enum StatementType{
+        INSERT,
+        QUERY,
+        DELETE,
+        UPDATE
+    }
+    public Connection getConnection() {
         return connection;
     }
     Connection validateAndGetConnection() throws SQLException{
@@ -142,17 +179,8 @@ public class DBService implements Serializable{
         return this.connection;
     }
 
-    public void setCon(Connection connection) {
+    public void setConnection(Connection connection) {
         this.connection = connection;
     }
-    private static final String userQuery="SELECT cookieId, cartId, r.email, credential, firstName, lastName," +
-            " city, district, street, buildingNo, coalesce(buildingName,''), innerDoorNo, coalesce(additional, '') " +
-            "FROM registeredcustomer r join address a ON r.email=a.email WHERE r.email=? AND credential=?";
-    private static final String createTempCart="CREATE temporary table customerCart " +
-            "SELECT c.total AS cartTotal ,s.quantity, s.productId, s.couponCode, s.totalPrice AS saleTotal FROM " +
-            " cart c join sale s on s.cartId=c.cartId WHERE c.cartId=?";
-    private static final String selectCart="SELECT  p.productId, p.image, p.title, p.basePrice, p.baseDiscount, p.discountedPrice, " +
-            "c.couponCode, coalesce(c.discount, 0) AS couponDiscount, cc.quantity, cc.saleTotal, cc.cartTotal FROM customerCart cc " +
-            "join product p ON cc.productId=p.productId LEFT OUTER JOIN coupon c ON cc.couponCode=c.couponCode";
     private static final String[] connectparams={"jdbc:mysql://localhost:3306/test", "root", "Yusuf_2002"};
 }

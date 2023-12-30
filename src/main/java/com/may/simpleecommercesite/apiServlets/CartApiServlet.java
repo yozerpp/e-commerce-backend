@@ -1,54 +1,40 @@
 package com.may.simpleecommercesite.apiServlets;
 
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.may.simpleecommercesite.annotations.Cookie;
 import com.may.simpleecommercesite.beans.DBService;
-import com.may.simpleecommercesite.helpers.ResultSetJsonConverter;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import com.may.simpleecommercesite.beans.EntityFactory;
+import com.may.simpleecommercesite.entities.Cart;
+import com.may.simpleecommercesite.entities.Entity;
+import com.may.simpleecommercesite.entities.Sale;
+import com.may.simpleecommercesite.filters.ExtendedHttpRequest;
+import com.may.simpleecommercesite.helpers.Json;
 
-import javax.annotation.Resource;
-import javax.json.Json;
-import javax.json.stream.JsonParser;
-import javax.servlet.*;
+import javax.servlet.AsyncContext;
 import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.*;
-import javax.sql.DataSource;
-import javax.sql.RowSet;
-import javax.sql.rowset.CachedRowSet;
-import java.io.CharArrayReader;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.sql.ResultSet;
+import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.List;
 
-@WebServlet(urlPatterns = {"/api/cart"}, asyncSupported = true)
-public class CartApiServlet extends BaseApiServlet{
-    DBService dbService;
-    @Resource(name = "java:comp/env/jdbc/pool/test")
-    DataSource dataSource;
+@WebServlet(urlPatterns = {"/api/cart"}, asyncSupported = true, name = "Cart")
+public class CartApiServlet extends ApiServlet {
     @Override
-    public void init(ServletConfig config) throws ServletException {
-        super.init(config);
-        try {
-            this.dbService=new DBService(dataSource, "root", "Yusuf_2002");
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        ResultSet cart=createCartIfNotExists(req, resp);
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
         resp.setContentType("application/json");
-        AsyncContext asyncContext= req.startAsync();
+        AsyncContext asyncContext = req.startAsync();
         asyncContext.start(new Runnable() {
             @Override
             public void run() {
-                ResultSet cart= (ResultSet) asyncContext.getRequest().getAttribute("cart");
                 try {
-                    asyncContext.getResponse().getWriter().print(ResultSetJsonConverter.cart(cart));
+                    DBService dbService = new DBService(dataSource);
+                    List<Sale> cart = (List<Sale>) ((HttpServletRequest) asyncContext.getRequest()).getSession().getAttribute(Sale.class.getSimpleName());
+                    PrintWriter out = asyncContext.getResponse().getWriter();
+                    new ObjectMapper().writeValue(out, cart);
+                    dbService.destroy();
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -57,64 +43,62 @@ public class CartApiServlet extends BaseApiServlet{
         });
     }
 
-    /**
-     * {productId: 1, quantity: 3, CouponCode:AXV13}
-     */
+    /* {productId: 1, quantity: 2, couponCode: ACS23}*/
     @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException{
-        ResultSet cart=createCartIfNotExists(req, resp);
-        char[] buf = new char[64];
-        req.getReader().read(buf);
-        int productId = 0;
-        int quantity = 0;
-        String cc = null;
-        JsonParser parse=Json.createParser(new CharArrayReader(buf));
-        while (parse.hasNext()){
-                if (parse.next()== JsonParser.Event.KEY_NAME) {
-                switch (parse.getString()){
-                    case "productId":
-                        parse.next();
-                        productId= parse.getInt();
-                        break;
-                    case "quantity":
-                        parse.next();
-                        quantity=parse.getInt();
-                        break;
-                    case "CouponCode":
-                        parse.next();
-                        cc=parse.getString();
-                        break;
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) {
+        AsyncContext asyncContext = req.startAsync();
+        asyncContext.start(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    DBService service = new DBService(dataSource);
+                    List<Sale> sales = (List<Sale>) ((HttpServletRequest) asyncContext.getRequest()).getSession().getAttribute(Sale.class.getSimpleName());
+                    Sale newSale = (Sale) Json.instantiateFromJson(asyncContext.getRequest().getReader(), Sale.class);
+                    newSale.setCartId(EntityFactory.cart(Integer.parseInt(Arrays.stream(((HttpServletRequest) asyncContext.getRequest()).getCookies()).filter(cookie -> cookie.getName().equals(Entity.getAnnotatedFields(Cart.class, Cookie.class).get(0).getName())).findFirst().get().getValue())));
+                    newSale.persist();
+                    sales.add(newSale);
+//                    ((HttpServletRequest) asyncContext.getRequest()).getSession().setAttribute(Sale.class.getSimpleName(), sales);
+                    ((HttpServletResponse) asyncContext.getResponse()).setStatus(HttpServletResponse.SC_CREATED);
+                    service.destroy();
+                    asyncContext.complete();
+                } catch (SQLException | IOException e) {
+                    throw new RuntimeException(e);
                 }
             }
-        }
-           if (dbService.insertSale(createCookieIfNotExists(req, resp), productId, quantity, cc)!=0)
-               resp.setStatus(HttpServletResponse.SC_CREATED);
-           else
-               resp.setStatus(HttpServletResponse.SC_EXPECTATION_FAILED);
+        });
     }
-    RowSet createCartIfNotExists(HttpServletRequest req, HttpServletResponse resp){
-        RowSet cart;
-        if ((cart = (RowSet) req.getSession().getAttribute("cart"))==null){
-            int cartId= createCookieIfNotExists(req, resp);
-            cart= dbService.cartById(cartId);
-            req.setAttribute("cart", cart);
-        }
-        return cart;
+    @Override
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) {
+        List<Sale> sales = (List<Sale>) req.getSession().getAttribute(Sale.class.getSimpleName());
+        sales.clear();
     }
-    int createCookieIfNotExists(HttpServletRequest req, HttpServletResponse resp){
-    int cartId;
-    Cookie[] activeCookies=req.getCookies();
-        Cookie cookie;
-        if (Arrays.stream(activeCookies).noneMatch((c -> c.getName()=="cart"))){
-            cartId=dbService.newCart();
-            cookie=new Cookie ("cart", Integer.toString(cartId));
-            cookie.setMaxAge(60*60);
-            resp.addCookie(cookie);
-        }
-        else {
-            cookie= Arrays.stream(activeCookies).filter(c -> c.getName()=="cart").findFirst().get();
-            cartId= Integer.parseInt(cookie.getValue());
-        }
-        return cartId;
+
+    /*{productId:1, quantity: 2, couponCode: null}*/
+    @Override
+    protected void doPut(HttpServletRequest req, HttpServletResponse resp) {
+        AsyncContext asyncContext = req.startAsync();
+        asyncContext.start(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    DBService service = new DBService(dataSource);
+                    List<Sale> sales = (List<Sale>) ((HttpServletRequest) asyncContext.getRequest()).getSession().getAttribute(Sale.class.getSimpleName());
+                    Sale newSale = (Sale) Json.instantiateFromJson(asyncContext.getRequest().getReader(), Sale.class);
+                    Sale oldSale = sales.stream().filter(sale -> sale.getProductId().getProductId() == newSale.getProductId().getProductId()).findFirst().get();
+                    if(newSale.getQuantity()!=0){
+                        oldSale.setCouponCode(newSale.getCouponCode());
+                        oldSale.setQuantity(newSale.getQuantity());
+                        oldSale.commit();
+                    } else {
+                        oldSale.remove();
+                    }
+                    ((HttpServletResponse) asyncContext.getResponse()).setStatus(HttpServletResponse.SC_ACCEPTED);
+                    service.destroy();
+                    asyncContext.complete();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
     }
 }
