@@ -1,0 +1,185 @@
+### Sepeti görüntüle
+GET http://localhost:8080/test/api/cart
+Content-Type: application/json
+Cookie: cartId=2
+### Gelen Yanıt :
+#[
+#  {
+#    "cartId": {
+#      "cartId": 2,
+#      "total": 14000000.00,
+#      "ordered": 0
+#    },
+#    "productId": {
+#      "productId": 1,
+#      "image": null,
+#      "title": "ürün",
+#      "description": null,
+#      "basePrice": 500000.00,
+#      "baseDiscount": 0,
+#      "avgRating": 3.5,
+#      "sellerId": 1,
+#      "discountedPrice": 500000.00,
+#      "bought": 0
+#    },
+#    "quantity": 4,
+#    "totalPrice": 2000000.00,
+#    "couponCode": null
+#  },
+#  {
+#    "cartId": {
+#      "cartId": 2,
+#      "total": 14000000.00,
+#      "ordered": 0
+#    },
+#    "productId": {
+#      "productId": 2,
+#      "image": null,
+#      "title": "ürün",
+#      "description": null,
+#      "basePrice": 500000.00,
+#      "baseDiscount": 0,
+#      "avgRating": null,
+#      "sellerId": 1,
+#      "discountedPrice": 500000.00,
+#      "bought": 0
+#    },
+#    "quantity": 8,
+#    "totalPrice": 4000000.00,
+#    "couponCode": null
+#  }
+#]
+
+
+### sepete ürün ekle (daha önce sepette bulunmayan)
+POST http://localhost:8080/test/api/cart
+Content-Type: application/json
+Cookie: cartId=2
+
+{
+  "productId": 5,
+  "quantity" : 2,
+  "couponCode": null
+}
+### Gelen yanıt: STATUS=201(Created)
+### sepette var olan ürünün saysını arttır
+PUT http://localhost:8080/test/api/cart
+Content-Type: application/json
+Cookie: cartId=2
+
+{
+  "productId" : 5,
+  "quantity": 1,
+  "couponCode": "AXC123"
+}
+###Gelen yanıt: 202(Accepted)
+### Sepeti temizle
+DELETE http://localhost:8080/test/api/cart
+### Yanıt: 202 (Accepted)
+### Kullanıcı bilgilerini görüntüle
+GET http://localhost:8080/test/api/user
+Content-Type: application/json
+### Yeni kullanıcı kaydet
+POST http://localhost:8080/test/api/user
+Content-Type: application/json
+Content-Encoding: utf-8
+
+{
+  "firstName": "Yusuf",
+  "lastName": "Özer",
+  "dateOfBirth": "2002-02-26",
+  "email": "a@b.com",
+  "credential": "ASasdsd324_123"
+}
+### Giriş yap
+POST http://localhost:8080/test/api/login
+Content-Type: application/json
+
+{
+  "email": "a@b.com",
+  "credential": "ASasdsd324_123"
+}
+### Gelen yanıt: Kullanıcı bulunamzsa 404, varse anasayfaya yönlendirir ("/")
+### Çıkış yap
+DELETE http://localhost:8080/test/api/login
+Content-Type: application/json
+### Gelen yanıt: 200
+### Ürün sayfası (productId yerine ürün id'si gelmeli)
+GET http://localhost:8080/test/api/product/{productId}
+### Gelen yanıt: {
+#  "productId": 1,
+#  "image": null,
+#  "title": "ürün",
+#  "description": null,
+#  "basePrice": 500000.00,
+#  "baseDiscount": 0,
+#  "avgRating": 3.5,
+#  "sellerId": 1,
+#  "discountedPrice": 500000.00,
+#  "bought": 0
+#}
+### Ürün değerlendirmeleri
+GET http://localhost:8080/test/api/product/{productId}/rating
+### gelen yanıt: [
+#  {
+#    "ratingId": 1,
+#    "productId": {
+#      "productId": 1,
+#      "image": null,
+#      "title": null,
+#      "description": null,
+#      "basePrice": null,
+#      "baseDiscount": 0,
+#      "avgRating": null,
+#      "sellerId": 0,
+#      "discountedPrice": null,
+#      "bought": 0
+#    },
+#    "firstName": "ahmet",
+#    "lastName": "özer",
+#    "dateRated": 1702207245000,
+#    "rate": 3.0,
+#    "comment": null,
+#    "authenticated": 1,
+#    "answer": null,
+#    "upCount": 1,
+#    "downCount": 0,
+#    "cookieId": 1
+#  },
+#  {
+#    "ratingId": 9,
+#    "productId": {
+#      "productId": 1,
+#      "image": null,
+#      "title": null,
+#      "description": null,
+#      "basePrice": null,
+#      "baseDiscount": 0,
+#      "avgRating": null,
+#      "sellerId": 0,
+#      "discountedPrice": null,
+#      "bought": 0
+#    },
+#    "firstName": "ahmet",
+#    "lastName": "özer",
+#    "dateRated": 1702220473000,
+#    "rate": 4.0,
+#    "comment": "good",
+#    "authenticated": 1,
+#    "answer": null,
+#    "upCount": 0,
+#    "downCount": 0,
+#    "cookieId": 3
+#  }
+#]
+### Ürün resmi
+GET http://localhost:8080/test/api/product/{productId}/image
+Accept: image/jpeg
+### Gelen yanıt: binary formatta ürün resmi
+
+
+### tüm ürünleri görüntüle
+GET http://localhost:8080/test/api/product
+Content-Type: application/json
+### Tüm ürünler, arama parametreleriyle birlikte
+GET http://localhost:8080/test/api/product?title=asd&priceHigh=100.0&priceLow=30.0&avgRatingHigh=3.0&avgRatingLow=1.0&boughtHigh=1000&boughtLow=1
