@@ -1,12 +1,6 @@
 package com.may.simpleecommercesite.beans;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.may.simpleecommercesite.beans.EntityFactory;
-import com.may.simpleecommercesite.helpers.Json;
 
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -19,16 +13,16 @@ import javax.sql.DataSource;
 public class ApplicationInitializer implements ServletContextListener {
     @Override
     public void contextInitialized(ServletContextEvent sce) {
+        ObjectMapper mapper=new ObjectMapper();
+        sce.getServletContext().setAttribute("ObjectMapper", mapper);
         try {
             Context ctx=new InitialContext();
-            EntityFactory.setDataSource((DataSource)ctx.lookup("java:comp/env/jdbc/pool/test"));
-
+            sce.getServletContext().setAttribute("DbContext",new DbContext(mapper, (DataSource)ctx.lookup("java:comp/env/jdbc/pool/test")));
         } catch (NamingException e) {
             throw new RuntimeException(e);
         }
+;
         sce.getServletContext().setRequestCharacterEncoding("utf-8");
         sce.getServletContext().setResponseCharacterEncoding("utf-8");
-        Json.setMapper(new ObjectMapper());
-        Json.setFactory(new JsonFactory().configure(JsonFactory.Feature.CHARSET_DETECTION, true));
     }
 }

@@ -7,7 +7,7 @@ import javax.servlet.http.HttpServletRequestWrapper;
 import java.util.*;
 
 public class ExtendedHttpRequest extends HttpServletRequestWrapper implements HttpServletRequest, ServletRequest {
-    List<Cookie> addedCookies;
+    private List<Cookie> addedCookies;
     public ExtendedHttpRequest(HttpServletRequest request) {
         super(request);
         addedCookies=new ArrayList<>();

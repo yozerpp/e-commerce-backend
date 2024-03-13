@@ -1,12 +1,9 @@
 package com.may.simpleecommercesite.apiServlets;
 
-import com.may.simpleecommercesite.beans.DBService;
-import com.may.simpleecommercesite.beans.EntityFactory;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.may.simpleecommercesite.entities.Cart;
 import com.may.simpleecommercesite.entities.Invoice;
 import com.may.simpleecommercesite.entities.RegisteredCustomer;
-import com.may.simpleecommercesite.filters.ExtendedHttpRequest;
-import com.may.simpleecommercesite.helpers.Json;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.ServletException;
@@ -14,104 +11,83 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.security.Principal;
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
-@WebServlet(urlPatterns = {"/api/invoice"}, asyncSupported = true, name = "Invoice")
+import java.util.Objects;
+
+@WebServlet(urlPatterns = {"/api/invoice", "/api/invoice/*"}, name = "Invoice")
 public class InvoiceApiServlet extends ApiServlet {
+    ObjectReader invoiceReader;
+
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        Map<String, Object> credentials=getOrdererEmail(req, resp);
-        resp.setContentType("application/json");
-        AsyncContext asyncContext= req.startAsync();
-        asyncContext.start(new Runnable() {
-            @Override
-            public void run() {
-                DBService service=new DBService(dataSource);
-                Invoice invoice= (Invoice) service.byFields(Invoice.class, credentials, false);
-                if (invoice!=null){
-                    try {
-                        Json.serializeObject(invoice, ((HttpServletResponse) asyncContext.getResponse()).getWriter());
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                } else resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-            }
-        });
-    }
-// {unregEmail?: a@b.com, deliveryAddress: address object, paymentMethod: atdoor, card: cardObject}
-    @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        AsyncContext asyncContext=req.startAsync();
-        asyncContext.start(new Runnable() {
-            @Override
-            public void run() {
-                DBService service=new DBService(dataSource);
-                ExtendedHttpRequest req=(ExtendedHttpRequest) asyncContext.getRequest();
-                HttpServletResponse resp=(HttpServletResponse) asyncContext.getResponse();
-                try{
-                    Invoice invoice= null;
-                    invoice = (Invoice) Json.instantiateFromJson(req.getReader(), Invoice.class);
-                    invoice.setCartId((Cart) EntityFactory.cart(Integer.parseInt(req.getCookie(Cart.class.getSimpleName()).get().getValue())));
-                    if(invoice.getUnregEmail()==null){
-                        RegisteredCustomer customer;
-                        if((customer=(RegisteredCustomer) req.getSession().getAttribute(RegisteredCustomer.class.getSimpleName()))==null){
-                            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                            asyncContext.complete();
-                        }
-                        invoice.setEmail(customer);
-                    }
-                    invoice.commit();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                } finally {
-                    service.destroy();
-                }
-                asyncContext.complete();
-            }
-        });
-    }
-    //{invoiceId:1 ,deliveryAddres: addressObject, status:canceled, paymentMethod: }
-    @Override
-    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        resp.setContentType("application/json");
-        AsyncContext asyncContext=req.startAsync();
-        asyncContext.start(new Runnable() {
-            @Override
-            public void run() {
-                Invoice invoice = null;
-                try {
-                    invoice = (Invoice) Json.instantiateFromJson(asyncContext.getRequest().getReader(), Invoice.class);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                Invoice oldInvoice= (Invoice) new Invoice(invoice.getInvoiceId()).fetch();
-                // ugly code
-                if (oldInvoice.getInvoiceStatus()!= Invoice.Status.InProgress) {
-                    resp.setStatus(HttpServletResponse.SC_CONFLICT);
-                    try {
-                        asyncContext.getResponse().getWriter().print("{\"error\":1}");
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                } else if (oldInvoice.getPaymentMethod()== Invoice.PaymentMethod.onlineCard && invoice.getPaymentMethod()!= Invoice.PaymentMethod.onlineCard){
-                    resp.setStatus(HttpServletResponse.SC_CONFLICT);
-                    try {
-                        asyncContext.getResponse().getWriter().print("{\"error\":2}");
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                } else {
-                    invoice.commit();
-                    resp.setStatus(HttpServletResponse.SC_ACCEPTED);
-                }
-                asyncContext.complete();
-            }
-        });
+    public void init() throws ServletException {
+        super.init();
+        invoiceReader=this.jsonMapper.readerFor(Invoice.class);
     }
 
-    private static Map<String, Object> getOrdererEmail(HttpServletRequest req, HttpServletResponse resp){
-        String email=req.getUserPrincipal().getName();
-        if (email==null){
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        Map<String, Object> credentials=getOrdererEmail(req);
+        resp.setContentType("application/json");
+        List<Invoice> results= dbContext.search(Invoice.class, credentials);
+        if (results.isEmpty())
+            resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+        else
+            jsonMapper.writeValue(resp.getWriter(), results);
+    }
+// {unregEmail?: a@b.com, deliveryAddress: address object, paymentMethod: atdoor}
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        Invoice invoice=invoiceReader.readValue(req.getReader());
+        if (req.getSession().getAttribute(RegisteredCustomer.class.getSimpleName())!=null)
+            invoice.setCustomer((RegisteredCustomer) req.getSession().getAttribute(RegisteredCustomer.class.getSimpleName()));
+        invoice.setCart((Cart) req.getSession().getAttribute(Cart.class.getSimpleName()));
+        try {
+            dbContext.insert(invoice);
+            Cart cart = dbContext.save(new Cart());
+            Arrays.stream(req.getCookies()).filter(cookie -> cookie.getName().equals(Cart.class.getSimpleName()))
+                            .peek(cookie -> cookie.setValue(getCookieValue(cart))).forEach(resp::addCookie);
+            req.setAttribute(Cart.class.getSimpleName(), cart);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    @Override
+    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json");
+        int invoiceId=extractResourceId(req.getPathInfo(), 1);
+        try {
+            Invoice invoice= invoiceReader.readValue(req.getReader());
+            invoice.setInvoiceId(invoiceId);
+            dbContext.update(invoice, false);
+        } catch (SQLException e) {
+            if (Objects.equals(e.getSQLState(), "45001")) resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+            else if (Objects.equals(e.getSQLState(), "45002")) resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            else throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        resp.setContentType("application/json");
+        int invoiceId=extractResourceId(req.getPathInfo(), 1);
+        Invoice invoice=new Invoice(invoiceId);
+        invoice.setInvoiceStatus(Invoice.Status.Canceled);
+        try {
+            dbContext.update(invoice, false);
+            resp.setStatus(HttpServletResponse.SC_ACCEPTED);
+        } catch (SQLException e) {
+            if (Objects.equals(e.getSQLState(), "45001")) resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+            else throw new RuntimeException(e);
+        }
+    }
+    private static Map<String, Object> getOrdererEmail(HttpServletRequest req){
+        RegisteredCustomer user= (RegisteredCustomer) req.getSession().getAttribute(RegisteredCustomer.class.getSimpleName());
+        if (user==null){
             return Map.of("unregEmail",req.getParameter("email"));
-        } else return Map.of("email", email);
+        } else return Map.of("email", user.getEmail());
     }
 }

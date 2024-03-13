@@ -1,8 +1,7 @@
-### Sepeti görüntüle
 GET http://localhost:8080/test/api/cart
 Content-Type: application/json
 Cookie: cartId=2
-### Gelen Yanıt :
+### Sepeti Görüntüle
 #[
 #  {
 #    "cartId": {
@@ -49,64 +48,86 @@ Cookie: cartId=2
 #    "couponCode": null
 #  }
 #]
-
-
-### sepete ürün ekle (daha önce sepette bulunmayan)
 POST http://localhost:8080/test/api/cart
 Content-Type: application/json
 Cookie: cartId=2
 
 {
-  "productId": 5,
+  "productId": 9,
   "quantity" : 2,
   "couponCode": null
 }
-### Gelen yanıt: STATUS=201(Created)
-### sepette var olan ürünün saysını arttır
+### Sepeti Görüntüle
+
 PUT http://localhost:8080/test/api/cart
 Content-Type: application/json
 Cookie: cartId=2
 
 {
-  "productId" : 5,
-  "quantity": 1,
-  "couponCode": "AXC123"
+  "productId" : 9,
+  "quantity": 0,
+  "couponCode": null
 }
-###Gelen yanıt: 202(Accepted)
-### Sepeti temizle
+### Sepete Ekle (daha önce sepette bulunmayan)
+# STATUS=201(Created)
 DELETE http://localhost:8080/test/api/cart
-### Yanıt: 202 (Accepted)
-### Kullanıcı bilgilerini görüntüle
-GET http://localhost:8080/test/api/user
+Cookie: cartId=2
+### Sepeti temizle
+# 202 (Accepted)
+GET http://localhost:8080/test/api/invoice?email=asd@qwe.com
+### Kayıtlı olmayan kullanıcının siparişleri (email parametre)
+GET http://localhost:8080/test/api/invoice
+### Kayıtlı kullanıcı siparişleri
+# {
+#  "invoiceId": 10,
+#  "cartId": {
+#    "cartId": 22,
+#    "total": 2500000.00,
+#    "ordered": 1
+#  },
+#  "dateOrdered": 1702220141000,
+#  "invoiceStatus": "InProgress",
+#  "paymentMethod": "onlineCard",
+#  "deliveryAddress": "adress",
+#  "paid": 2500000.00
+#}
+POST http://localhost:8080/test/api/invoice
 Content-Type: application/json
-### Yeni kullanıcı kaydet
-POST http://localhost:8080/test/api/user
-Content-Type: application/json
-Content-Encoding: utf-8
 
 {
-  "firstName": "Yusuf",
-  "lastName": "Özer",
-  "dateOfBirth": "2002-02-26",
-  "email": "a@b.com",
-  "credential": "ASasdsd324_123"
+  "deliveryAddress": "adres",
+  "paymentMethod": "onlineCard",
+  "unregEmail": "asd@asd.com"
 }
-### Giriş yap
-POST http://localhost:8080/test/api/login
+### kayıtsız müşteri için sepeti satın al
+# 201
+
+POST http://localhost:8080/test/api/invoice
 Content-Type: application/json
 
 {
-  "email": "a@b.com",
-  "credential": "ASasdsd324_123"
+  "deliveryAddress": "adres",
+  "paymentMethod": "OnlineCard"
 }
-### Gelen yanıt: Kullanıcı bulunamzsa 404, varse anasayfaya yönlendirir ("/")
-### Çıkış yap
-DELETE http://localhost:8080/test/api/login
+### Kayıtlı müşteri için sepeti satın al
+# 201
+PUT http://localhost:8080/test/api/invoice
 Content-Type: application/json
-### Gelen yanıt: 200
+
+{
+  "deliveryAddress" : "newAddress",
+  "paymentMethod" : "OnlineCard",
+  "invoiceStatus" : "Canceled"
+}
+### Siparişi güncelleme
+# eğer güncellenen siparişin status'u "Completed" veya "Canceled" ise 409
+# eğer sipariş hali hazırda OnlineCard methodu ile ödenmiş ise 406
+# başırılı ise 202
+DELETE http://localhost:8080/test/api/invoice/1
+### siparişi iptal et
+GET http://localhost:8080/test/api/product/1
 ### Ürün sayfası (productId yerine ürün id'si gelmeli)
-GET http://localhost:8080/test/api/product/{productId}
-### Gelen yanıt: {
+# {
 #  "productId": 1,
 #  "image": null,
 #  "title": "ürün",
@@ -118,9 +139,13 @@ GET http://localhost:8080/test/api/product/{productId}
 #  "discountedPrice": 500000.00,
 #  "bought": 0
 #}
+GET http://localhost:8080/test/api/product/1/image
+Accept: image/jpeg
+### Ürün resmi
+# binary formatta ürün resmi
+GET http://localhost:8080/test/api/product/1/rating
 ### Ürün değerlendirmeleri
-GET http://localhost:8080/test/api/product/{productId}/rating
-### gelen yanıt: [
+# [
 #  {
 #    "ratingId": 1,
 #    "productId": {
@@ -172,14 +197,43 @@ GET http://localhost:8080/test/api/product/{productId}/rating
 #    "cookieId": 3
 #  }
 #]
-### Ürün resmi
-GET http://localhost:8080/test/api/product/{productId}/image
-Accept: image/jpeg
-### Gelen yanıt: binary formatta ürün resmi
+POST http://localhost:8080/test/api/product/1/rating
+Content-Type: application/json
+Content-Encoding: utf-8
 
+{
+  "rate": 3.0,
+  "comment": "good",
+  "firstName": "Hi!",
+  "lastName": "Bruh"
+}
+### Ürün değerlendir
+# Aynı kişi daha önce değerlendirme yaptıysa 409 değilse 201
+POST http://localhost:8080/test/api/product/1/rating/1/vote
+Content-Type: application/json
+Content-Encoding: utf-8
 
-### tüm ürünleri görüntüle
+{
+  "vote": "up"
+}
+### Değerlendirme oyla (varolan oyu değiştirmek için de bu isteği kullan)
+# 202
+PUT http://localhost:8080/test/api/product/1/rating/1
+Content-Type: application/json
+Content-Encoding: utf-8
+
+{
+  "rate": 1.0,
+  "comment": "bad"
+}
+### değerlendirmeyi değiştir
+# 202
+DELETE http://localhost:8080/test/api/product/1/rating/1
+Content-Encoding: utf-8
+### Değerlendirmeyi sil
+# 202
 GET http://localhost:8080/test/api/product
 Content-Type: application/json
+### tüm ürünleri görüntüle
+GET http://localhost:8080/test/api/product?basePriceHigh=100
 ### Tüm ürünler, arama parametreleriyle birlikte
-GET http://localhost:8080/test/api/product?title=asd&priceHigh=100.0&priceLow=30.0&avgRatingHigh=3.0&avgRatingLow=1.0&boughtHigh=1000&boughtLow=1

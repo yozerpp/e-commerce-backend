@@ -1,15 +1,10 @@
 package com.may.simpleecommercesite.apiServlets;
 
 
-import com.may.simpleecommercesite.beans.DBService;
-import com.may.simpleecommercesite.beans.EntityFactory;
-import com.may.simpleecommercesite.entities.Cart;
-import com.may.simpleecommercesite.entities.Entity;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.may.simpleecommercesite.entities.RegisteredCustomer;
 import com.may.simpleecommercesite.entities.Sale;
-import com.may.simpleecommercesite.filters.CookieFilter;
 import com.may.simpleecommercesite.helpers.ErrandBoy;
-import com.may.simpleecommercesite.helpers.Json;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.ServletException;
@@ -18,61 +13,45 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
 import java.util.Map;
 
-@WebServlet( urlPatterns = {"/api/login"}, asyncSupported = true)
+@WebServlet( urlPatterns = {"/api/login"}, name = "Login")
 public class LoginApiServlet extends ApiServlet {
-    // body: {email: asdads@gmail.com, password: password123}
+    ObjectReader userReader;
+
     @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        Map<String, Object> credentials= Json.parseJson(req.getReader());
+    public void init() throws ServletException {
+        super.init();
+        userReader=this.jsonMapper.readerFor(RegisteredCustomer.class);
+    }
+
+    // body: {email: asdads@gmail.com, password: password123}
+    // TODO Encrypt the cookies and user credentials.
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
+        Map<String, String> credentials= jsonMapper.readValue(req.getReader(), Map.class);
         if (req.getSession().getAttribute(RegisteredCustomer.class.getSimpleName())!=null) resp.sendRedirect("/");
-        AsyncContext asyncContext=req.startAsync();
-        asyncContext.start(new Runnable() {
-            @Override
-            public void run() {
-                DBService service;
-                HttpServletResponse resp=(HttpServletResponse) asyncContext.getResponse();
-                HttpServletRequest req=(HttpServletRequest) asyncContext.getRequest();
-                service =new DBService(dataSource);
-                // Encrypt the cookies and user credentials.
-                RegisteredCustomer customer= null;
-                customer = (RegisteredCustomer) service.byFields(RegisteredCustomer.class, Map.of("email", credentials.get("email"), "credential" , credentials.get("credential")), false).get(0);
-                if(customer==null){
-                    resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                    asyncContext.complete();
-                }
-                try {
-                    req.login((String) credentials.get("email"), (String) credentials.get("credential"));
-                } catch (ServletException e) {
-                    throw new RuntimeException(e);
-                }
-                RegisteredCustomer finalCustomer = (RegisteredCustomer) customer.fetch();
-                    Entity.getAnnotatedFields(RegisteredCustomer.class,com.may.simpleecommercesite.annotations.Cookie.class).stream()
-                            .map(field -> {
-                                try {
-                                    return new Cookie(field.getName(),finalCustomer.getClass().getDeclaredMethod("get" +ErrandBoy.firstLetterToUpperCase(field.getName()), field.getType()).invoke(finalCustomer).toString());
-                                } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            })
-                            .forEach(resp::addCookie);
-                req.getSession().setAttribute(RegisteredCustomer.class.getSimpleName(),customer);
-                try {
-                    resp.sendRedirect("/");
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                asyncContext.complete();
-            }
-        });
+        RegisteredCustomer customer=dbContext.findById(RegisteredCustomer.class, credentials.get("email"));
+        if(customer==null){
+            resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+        // TODO DOES RESP.ADDCOOKIE OVERWRITE COOKIES?
+        Map<String, String> cookieVal= getCookieValues(customer);
+        if (req.getCookies()!=null)
+            Arrays.stream(req.getCookies()).filter(cookie -> cookieVal.containsKey(cookie.getName()))
+                    .peek(cookie -> cookie.setValue(cookieVal.get(cookie.getName())))
+                    .forEach(resp::addCookie);
+        else cookieVal.entrySet().forEach(entry->resp.addCookie(createGlobalCookie(entry.getKey(), entry.getValue())));
+        req.getSession().setAttribute(RegisteredCustomer.class.getSimpleName(),customer);
+//        resp.sendRedirect("/");
     }
     @Override
     protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         req.getSession().removeAttribute(RegisteredCustomer.class.getSimpleName());
         req.getSession().removeAttribute(Sale.class.getSimpleName());
         req.logout();
-        resp.sendRedirect("/login");
+//        resp.sendRedirect("/login");
     }
 }

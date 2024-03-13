@@ -1,29 +1,26 @@
 package com.may.simpleecommercesite.entities;
 
+import com.may.simpleecommercesite.annotations.Entity;
 import com.may.simpleecommercesite.annotations.Id;
+import com.may.simpleecommercesite.annotations.OneToOne;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.Objects;
-
-public class Coupon extends Entity implements Serializable {
+@Entity
+public class Coupon implements Serializable {
 
     @Id
      String couponCode;
 
     
-     java.math.BigDecimal discount;
-
+     int discount;
      Timestamp validUntil;
-     Seller sellerId;
-     boolean couponCodeDirty;
-     boolean discountDirty;
-     boolean validUntilDirty;
-     boolean sellerIdDirty;
+     @OneToOne(joinColumn = "sellerId")
+     Seller seller;
     // Constructor for required fields
-    public Coupon(String couponCode, BigDecimal discountAmount, Timestamp validUntil) {
+    public Coupon(String couponCode, int discountAmount, Timestamp validUntil) {
         this.couponCode = couponCode;
         this.validUntil = validUntil;
         this.discount = discountAmount;
@@ -36,7 +33,7 @@ public class Coupon extends Entity implements Serializable {
 
     public Coupon(String couponCode, Seller seller) {
         this(couponCode);
-        this.sellerId=seller;
+        this.seller =seller;
     }
 
     // Getters and setters (including dirty flags)
@@ -45,14 +42,12 @@ public class Coupon extends Entity implements Serializable {
     }
     public void setCouponCode( String code) {
         this.couponCode = code;
-        this.couponCodeDirty = true;
     }
-    public java.math.BigDecimal getDiscount() {
+    public int getDiscount() {
         return discount;
     }
-    public void setDiscount( java.math.BigDecimal discountAmount) {
+    public void setDiscount( int discountAmount) {
         this.discount = discountAmount;
-        this.discountDirty = true;
     }
 
     public Timestamp getValidUntil() {
@@ -61,15 +56,12 @@ public class Coupon extends Entity implements Serializable {
 
     public void setValidUntil(Timestamp validUntil) {
         this.validUntil = validUntil;
-        this.validUntilDirty = true;
     }
-    public Seller getSellerId(){
-
-        return (Seller) this.sellerId.fetch();
+    public Seller getSeller(){
+        return seller;
     }
-    public void setSellerId(Seller seller){
-        this.sellerId=seller;
-        this.sellerIdDirty=true;
+    public void setSeller(Seller seller){
+        this.seller =seller;
     }
 
     // Equals and hashCode methods
@@ -77,11 +69,9 @@ public class Coupon extends Entity implements Serializable {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
+        if (o == null || !getClass().isAssignableFrom(o.getClass())) return false;
         Coupon coupon = (Coupon) o;
-
-        return Objects.equals(couponCode, coupon.couponCode);
+        return Objects.equals(getCouponCode(), coupon.getCouponCode());
     }
 
     @Override

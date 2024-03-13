@@ -1,12 +1,7 @@
 package com.may.simpleecommercesite.apiServlets;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.may.simpleecommercesite.beans.DBService;
-import com.may.simpleecommercesite.entities.Product;
-import com.may.simpleecommercesite.entities.Rating;
-import com.may.simpleecommercesite.helpers.Json;
-import org.apache.commons.lang.NullArgumentException;
-import org.owasp.esapi.codecs.Base64;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.may.simpleecommercesite.entities.*;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.ServletException;
@@ -16,131 +11,136 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
-import java.sql.ResultSet;
+import java.nio.channels.AcceptPendingException;
+import java.sql.SQLException;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@WebServlet(urlPatterns = {"/api/product", "/api/product/*"}, asyncSupported = true)
+@WebServlet(urlPatterns = {"/api/product", "/api/product/*"})
 public class ProductApiServlet extends ApiServlet{
+    ObjectReader productReader;
+    ObjectReader ratingReader;
+    ObjectReader ratingVoteReader;
+
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    public void init() throws ServletException {
+        super.init();
+        this.productReader=this.jsonMapper.readerForArrayOf(Product.class);
+        this.ratingReader=this.jsonMapper.readerFor(Rating.class);
+        this.ratingVoteReader=this.jsonMapper.readerFor(RatingVote.class);
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json");
         String pathInfo=req.getPathInfo();
-        if (pathInfo.isEmpty()) {
+        if (pathInfo==null) {
             resp.addHeader("Cache-Control", "public, max-age=7200");
             Map<String, Object> params = new HashMap<>();
-            for (Map.Entry<String, Class<?>> entry : paramNames.entrySet()) {
-                Class<?> type = entry.getValue();
-                String paramName = entry.getKey();
-                params.put(paramName, type.cast(assignNumOrNull(type, req.getParameter(paramName))));
-            }
-            AsyncContext asyncContext = req.startAsync();
-            asyncContext.start(new Runnable() {
-                @Override
-                public void run() {
-                    DBService service = new DBService(dataSource);
-                    List<Product> products = (List<Product>) service.byFields(Product.class, params, false);
-                    try {
-                        if (products != null) Json.serializeObject(products, asyncContext.getResponse().getWriter());
-                        else ((HttpServletResponse) asyncContext.getResponse()).setStatus(HttpServletResponse.SC_NOT_FOUND);
-                    } catch (IOException e){
-                        throw new RuntimeException(e);
-                    } finally {
-                        service.destroy();
-                        asyncContext.complete();
-                    }
-                }
-            });
+            for (Map.Entry<String, String[]> param: req.getParameterMap().entrySet())
+                params.put(param.getKey(), param.getValue()[0]);
+            List<Product> products = dbContext.search(Product.class, params);
+            if (products != null) jsonMapper.writeValue(resp.getWriter(),products);
+            else resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
         }
         else{
             Matcher productIdFinder=Pattern.compile("/(\\d+).*").matcher(pathInfo);
             productIdFinder.find();
             int productId= Integer.parseInt(productIdFinder.group(1));
             if(pathInfo.matches("^/\\d+$")){
-                Map<String, Object> params=Map.of("productId", productId);
-                AsyncContext asyncContext =req.startAsync();
-                asyncContext.start(new Runnable() {
-                    @Override
-                    public void run() {
-                        DBService service=new DBService(dataSource);
-                        Product product= (Product) service.byFields(Product.class, params, false).get(0);
-                        try {
-                            Json.serializeObject(product,asyncContext.getResponse().getWriter());
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                        finally {
-                            service.destroy();
-                            asyncContext.complete();
-                        }
-                    }
-                });
+                Product product= dbContext.findById(Product.class, productId);
+                jsonMapper.writeValue(resp.getWriter(), product);
             } else if (pathInfo.matches(".*/rating")){
                 Map<String, Object> params=Map.of("productId", productId);
-                AsyncContext asyncContext= req.startAsync();
-                asyncContext.start(new Runnable() {
-                    @Override
-                    public void run() {
-                        DBService service=new DBService(dataSource);
-                        List<Rating> ratings= (List<Rating>) service.byFields(Rating.class, params, false);
-                        try {
-                            Json.serializeObject(ratings, asyncContext.getResponse().getWriter());
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        } finally {
-                            service.destroy();
-                            asyncContext.complete();
-                        }
-                    }
-                });
+                List<Rating> ratings= dbContext.findById(Product.class, productId).getRatings();
+                jsonMapper.writeValue(resp.getWriter(), ratings);
             } else if (pathInfo.matches(".*/image")){
                 resp.setContentType("image/jpeg");
-                AsyncContext asyncContext=req.startAsync();
-                asyncContext.start(new Runnable() {
-                    @Override
-                    public void run() {
-                        DBService service=new DBService(dataSource);
-                        byte[] image= ((Product)service.byFields(Product.class, Map.of("productId", productId), true).get(0)).getImage();
-                        try {
-                            resp.getWriter().print(Base64.encodeBytes( image));
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        } finally {
-                            service.destroy();
-                            asyncContext.complete();
-                        }
-                    }
-                });
+                byte[] image= dbContext.findById(Product.class, productId).getImage();
+                if (image==null)
+                    resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                else
+                    resp.getWriter().print(Base64.getMimeEncoder().encodeToString(image));
             }
         }
     }
 
-//    @Override
-//    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-//        String servletPath=req.getServletPath();
-//        if(servletPath.equals("/api/product/")) {
-//            Pattern productIdPattern=Pattern.compile("^(\\d+)");
-//            String pathInfo=req.getPathInfo();
-//            int productId= Integer.parseInt(productIdPattern.matcher(pathInfo).group(1));
-//            //{firstName, lastName, rate, comment}
-//            if (pathInfo.matches("\\d+/rating")){
-//
-//            }
-//        } else {
-//            resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-//        }
-//    }
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        String pathInfo=req.getPathInfo();
+        int cookieId= getCookieValue(req, Customer.class);
+        int productId=extractResourceId(pathInfo, 1);
+        if (pathInfo.matches(".*/rating$")){
+            try {
+                Rating rating = ratingReader.readValue(req.getReader());
+                if (rating.getFirstName() == null | rating.getLastName() == null) {
+                    if (req.getSession().getAttribute(RegisteredCustomer.class.getSimpleName()) == null) {
+                        resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                        return;
+                    } else {
+                        RegisteredCustomer customer = (RegisteredCustomer) req.getSession().getAttribute(RegisteredCustomer.class.getSimpleName());
+                        if (customer == null)
+                            resp.sendRedirect("/login");
+                        rating.setFirstName(customer.getFirstName());
+                        rating.setLastName(customer.getLastName());
+                    }
+                }
+                rating.setProduct(new Product(productId));
+                rating.setCookieId(cookieId);
+                dbContext.insert(rating);
+                resp.setStatus(HttpServletResponse.SC_CREATED);
+            } catch (SQLException e) {
+                if (e.getErrorCode()==1062) resp.setStatus(HttpServletResponse.SC_CONFLICT);
+                else throw new RuntimeException(e);
+            }
+        } else if (pathInfo.matches(".*/rating/\\d+/vote")){
+            int ratingId= extractResourceId(pathInfo, 2);
+            try {
+                RatingVote vote=ratingVoteReader.readValue(req.getReader());
+                vote.setRating(new Rating(ratingId));
+                vote.setCookieId(cookieId);
+                dbContext.save(vote);
+                resp.setStatus(HttpServletResponse.SC_CREATED);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
 
+    @Override
+    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        String pathInfo=req.getPathInfo();
+        int productId=extractResourceId(pathInfo, 1);
+        int ratingId=extractResourceId(pathInfo, 2);
+        if (pathInfo.matches(".*/rating/\\d+")){
+            try {
+                Rating rating= ratingReader.readValue(req.getReader());
+                rating.setRatingId(ratingId);
+                dbContext.save(rating);
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        String pathInfo=req.getPathInfo();
+        int ratingId=extractResourceId(pathInfo, 2);
+        if(pathInfo.matches(".*/rating/\\d+$")){
+            dbContext.remove(new Rating(ratingId));
+            resp.setStatus(HttpServletResponse.SC_ACCEPTED);
+        }
+    }
     private static Object assignNumOrNull(Class<?> clazz, String value){
         Object val=null;
         try {
             val =clazz.getConstructor(String.class).newInstance(value);
-        } catch (NumberFormatException | NullArgumentException | NoSuchMethodException | InstantiationException |
+        } catch (NumberFormatException  | NoSuchMethodException | InstantiationException |
                  IllegalAccessException | InvocationTargetException ignored){}
         return val;
     }

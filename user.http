@@ -1,0 +1,29 @@
+GET http://localhost:8080/test/api/user
+Content-Type: application/json
+### Kullanıcı bilgilerini görüntüle
+#
+POST http://localhost:8080/test/api/user
+Content-Type: application/json
+Content-Encoding: utf-8
+
+{
+  "firstName": "sad",
+  "lastName": "keasdrami",
+  "dateOfBirth": "2002-12-26",
+  "email": "ghgfhf@qwe.com",
+  "credential": "asdsadsa213123"
+}
+### Yeni kullanıcı kaydet
+# başarılıysa "/login"e yönlendir kullanıcı adı mevcutsa 409 (conflict)
+PUT http://localhost:8080/test/api/user
+Content-Type: application/json
+Content-Encoding: utf-8
+
+{
+  "firstName": "qwe",
+  "lastName": "asd",
+  "dateOfBirth": "2002-12-26"}
+### Kullanıcı bilgilerini güncelle
+DELETE http://localhost:8080/test/api/user
+### Kullanıcı sil
+# anasayfaya("/") yönlendir
