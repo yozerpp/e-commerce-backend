@@ -1,30 +1,30 @@
 package com.may.simpleecommercesite.entities;
-import javax.validation.constraints.NotNull;
+import com.fasterxml.jackson.annotation.JsonFilter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.may.simpleecommercesite.annotations.*;
+
 import java.io.Serializable;
 import java.util.Objects;
-
-public class RatingVote extends Entity implements Serializable {
-     Rating ratingId;
+@Entity
+@AggregateMember(in=Rating.class)
+public class RatingVote implements Serializable {
+    @Id
+    @OneToOne(joinColumn = "ratingId")
+     Rating rating;
      VoteType vote;
-     int cookieId;
-     boolean ratingIdDirty;
-     boolean voteDirty;
-     boolean cookieIdDirty;
-
+     @JsonIgnore
+     @Id
+     @OneToOne(joinColumn = "customerId")
+     Customer customer;
     public enum VoteType {
         UP, DOWN
     }
-    // Constructor for required fields
-    public RatingVote(Rating ratingId,  VoteType vote, int cookieId) {
-        this(ratingId, cookieId);
-        this.vote = vote;
+    public RatingVote(Rating rating, Customer customerId){
+        this(rating);
+        this.customer = customerId;
     }
-    public RatingVote(Rating ratingId, int cookieId){
-        this(ratingId);
-        this.cookieId=cookieId;
-    }
-    public RatingVote(Rating ratingId){
-        this.ratingId=ratingId;
+    public RatingVote(Rating rating){
+        this.rating = rating;
     }
     // Empty constructor
     public RatingVote() {
@@ -32,13 +32,12 @@ public class RatingVote extends Entity implements Serializable {
 
     // Getters and setters (including dirty flags)
 
-    public Rating getRatingId() {
-        return ratingId;
+    public Rating getRating() {
+        return rating;
     }
 
-    public void setRatingId(Rating ratingId) {
-        this.ratingId = ratingId;
-        this.ratingIdDirty = true;
+    public void setRating(Rating rating) {
+        this.rating = rating;
     }
 
     
@@ -48,16 +47,14 @@ public class RatingVote extends Entity implements Serializable {
 
     public void setVote( VoteType vote) {
         this.vote = vote;
-        this.voteDirty = true;
     }
 
-    public int getCookieId() {
-        return cookieId;
+    public Customer getCustomer() {
+        return customer;
     }
 
-    public void setCookieId(int cookieId) {
-        this.cookieId = cookieId;
-        this.cookieIdDirty = true;
+    public void setCustomer(Customer customerId) {
+        this.customer = customerId;
     }
 
     // Equals and hashCode methods
@@ -65,13 +62,13 @@ public class RatingVote extends Entity implements Serializable {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (o == null || !getClass().isAssignableFrom(o.getClass())) return false;
         RatingVote that = (RatingVote) o;
-        return cookieId == that.cookieId && ratingId.equals(that.ratingId);
+        return Objects.equals(getCustomer(),that.getCustomer()) && Objects.equals(getRating(), that.getRating());
     }
 
     @Override
     public int hashCode() {
-       return Objects.hash(ratingId, cookieId);
+       return Objects.hash(rating, customer);
     }
 }

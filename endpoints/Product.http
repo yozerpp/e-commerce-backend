@@ -1,0 +1,115 @@
+### tüm ürünleri görüntüle
+GET http://localhost:8080/api/product
+Content-Type: application/json
+#[
+#  {
+#    "productId": 20,
+#    "image": null,
+#    "title": "ürün",
+#    "description": "açıklama",
+#    "basePrice": 200.00,
+#    "discount": 0,
+#    "avgRating": 4.00,
+#    "seller": {
+#      "sellerId": 1,
+#      "name": "satıcı",
+#      "address": {
+#        "street": "st",
+#        "city": null,
+#        "district": "dist",
+#        "buildingNo": null,
+#        "innerDoorNo": null
+#      }
+#    },
+#    "discountedPrice": 200.00,
+#    "saleCount": 48
+#  }
+#]
+### Tüm ürünler, arama parametreleriyle birlikte
+GET http://localhost:8080/api/product?originalPriceDesc=true
+### Ürün sayfası (productId yerine ürün id'si gelmeli)
+GET http://localhost:8080/api/product/11
+
+#{
+#  "productId": 1,
+#  "image": null,
+#  "title": "anan",
+#  "description": "açıklama",
+#  "basePrice": 200.00,
+#  "discount": 0,
+#  "avgRating": 4.00,
+#  "seller": {
+#    "sellerId": 1,
+#    "name": "satıcı",
+#    "address": {
+#      "street": "st",
+#      "city": null,
+#      "district": "dist",
+#      "buildingNo": null,
+#      "innerDoorNo": null
+#    }
+#  },
+#  "discountedPrice": 200.00,
+#  "saleCount": 118
+#}
+### Ürün resmi
+GET http://localhost:8080/api/product/1/image
+Accept: image/jpeg
+# binary formatta ürün resmi
+### Ürün değerlendirmeleri
+
+GET http://localhost:8080/api/product/11/rating
+#[
+#  {
+#    "ratingId": 30,
+#    "firstName": "qwe",
+#    "lastName": "asggd",
+#    "dateRated": null,
+#    "rating": 3.5,
+#    "comment": "good",
+#    "confirmed": false,
+#    "upVotes": 0,
+#    "downVotes": 0
+#  }
+#]
+###
+POST http://localhost:8080/api/product/3/rating
+Content-Type: application/json
+Content-Encoding: utf-8
+
+{
+  "rating": 3.5,
+  "comment": "good",
+  "firstName": "isim",
+  "lastName": "soyisim"
+}
+###
+POST http://localhost:8080/api/product/11/rating
+Content-Type: application/json
+Content-Encoding: utf-8
+
+{
+  "rating": 3.5,
+  "comment": "good"
+}
+### Ürün değerlendir
+# Aynı kişi daha önce değerlendirme yaptıysa 409 değilse 201
+POST http://localhost:8080/api/product/11/rating/20003/vote?up
+Content-Type: application/json
+Content-Encoding: utf-8
+### Değerlendirme oyla (varolan oyu değiştirmek için de bu isteği kullan)
+# 202
+PUT http://localhost:8080/api/product/11/rating/20003
+Content-Type: application/json
+Content-Encoding: utf-8
+
+{
+  "rating": 0.0,
+  "comment": "bad"
+}
+### değerlendirmeyi değiştir
+# 202
+DELETE http://localhost:8080/api/product/11/rating/20005
+Content-Encoding: utf-8
+### Değerlendirmeyi sil
+# 202

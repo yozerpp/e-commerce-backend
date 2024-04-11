@@ -1,76 +1,69 @@
 package com.may.simpleecommercesite.entities;
 
-import com.may.simpleecommercesite.annotations.Cookie;
-import com.may.simpleecommercesite.annotations.Id;
-import com.may.simpleecommercesite.annotations.SecondId;
+import com.fasterxml.jackson.annotation.JsonFilter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.may.simpleecommercesite.annotations.*;
 
-import javax.validation.constraints.Null;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.Objects;
-
-public class Sale extends Entity implements Serializable {
+@Entity
+public class Sale implements Serializable {
      @Id
-     @Cookie
-     public Cart cartId;
-     @SecondId
-     public Product productId;
-
-    
-     public int quantity;
-
-    
-     public java.math.BigDecimal totalPrice;
-
-     public Coupon couponCode;
-
-     boolean cartIdDirty;
-     boolean productIdDirty;
-     boolean quantityDirty;
-     boolean totalPriceDirty;
-     boolean couponCodeDirty;
-    // Constructor for required fields
-    public Sale(Cart cartId,Coupon couponCode, Product productId,  int quantity) {
-        this(productId, quantity);
-        this.cartId = cartId;
-        this.couponCode = couponCode;
-    }
-    public Sale(Cart cartId, Coupon couponCode, Product productId) {
-        this(productId);
-        this.cartId = cartId;
-        this.couponCode = couponCode;
-    }
-    public Sale (Product productId, int quantity){
-        this(productId);
-        this.quantity=quantity;
-    }
-    public Sale(Product productId){
-        this.productId=productId;
-    }
-    public Sale(Cart cartId){
-        this.cartId=cartId;
-    }
+     @ManyToOne(joinColumn = "cartId")
+     @JsonIgnore
+     @JsonFilter("depth_4")
+     private Cart cart;
+    @Id
+     @OneToOne(joinColumn = "productId")
+     @JsonFilter("depth_4")
+     private Product product;
+    @ManyToOne(joinColumn = "couponId")
+     @JsonFilter("depth_4")
+     private Coupon coupon;
+     private int quantity;
+     private java.math.BigDecimal price;
+     private BigDecimal finalTotal;
     public Sale() {
     }
-    // Constructors for combinations of fields that don't have  annotation
-
-
-    // Getters and setters (including dirty flags)
-
-    public Cart getCartId() {
-        return (Cart) cartId.fetch();
+    public Sale (Product product, Cart cart){
+        this(product);
+        this.cart=cart;
+        this.quantity=1;
     }
-    public void setCartId(Cart cartId) {
-        this.cartId = cartId;
-        this.cartIdDirty = true;
+    public Sale(Product product){
+        this.product = product;
+    }
+    public Sale(Cart cart){
+        this.cart = cart;
+    }
+    public BigDecimal getFinalTotal() {
+        return finalTotal;
     }
 
-    public Product getProductId() {
-        if (productId==null) return productId;
-        else return (Product) productId.fetch();
+    public void setFinalTotal(BigDecimal finalTotal) {
+        this.finalTotal = finalTotal;
     }
-    public void setProductId(Product productId) {
-        this.productId = productId;
-        this.productIdDirty = true;
+
+    public Coupon getCoupon() {
+        return coupon;
+    }
+
+    public void setCoupon(Coupon coupon) {
+        this.coupon = coupon;
+    }
+    public Cart getCart() {
+        return cart;
+    }
+    public void setCart(Cart cart) {
+        this.cart = cart;
+    }
+
+    public Product getProduct() {
+        return product;
+    }
+    public void setProduct(Product product) {
+        this.product = product;
     }
 
     
@@ -80,41 +73,30 @@ public class Sale extends Entity implements Serializable {
 
     public void setQuantity( int quantity) {
         this.quantity = quantity;
-        this.quantityDirty = true;
     }
 
     
-    public java.math.BigDecimal getTotalPrice() {
-        return totalPrice;
+    public java.math.BigDecimal getPrice() {
+        return price;
     }
 
-    public void setTotalPrice( java.math.BigDecimal totalPrice) {
-        this.totalPrice = totalPrice;
-        this.totalPriceDirty = true;
+    public void setPrice(java.math.BigDecimal price) {
+        this.price = price;
     }
-    public Coupon getCouponCode() {
-        if (couponCode== null) return null;
-        else return (Coupon) couponCode.fetch();
-    }
-    public void setCouponCode(Coupon couponCode) {
-        this.couponCode = couponCode;
-        this.couponCodeDirty = true;
-    }
+
 
     // Equals and hashCode methods
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
+        if (o == null || !getClass().isAssignableFrom(o.getClass())) return false;
         Sale sale = (Sale) o;
-
-        return cartId.equals(sale.cartId) && productId.equals( sale.productId);
+        return Objects.equals(getCart(), sale.getCart()) && Objects.equals(getProduct(), sale.getProduct());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(cartId.hashCode(), productId.hashCode());
+        return Objects.hash(cart, product);
     }
 }

@@ -1,91 +1,77 @@
 package com.may.simpleecommercesite.entities;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.may.simpleecommercesite.annotations.Column;
+import com.may.simpleecommercesite.annotations.Entity;
 import com.may.simpleecommercesite.annotations.Id;
+import com.may.simpleecommercesite.annotations.ManyToOne;
 
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
-import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.Objects;
-
-public class Coupon extends Entity implements Serializable {
-
+@Entity
+public class Coupon implements Serializable {
+    @Column(name = "couponId")
     @Id
-     String couponCode;
-
-    
-     java.math.BigDecimal discount;
-
-     Timestamp validUntil;
-     Seller sellerId;
-     boolean couponCodeDirty;
-     boolean discountDirty;
-     boolean validUntilDirty;
-     boolean sellerIdDirty;
-    // Constructor for required fields
-    public Coupon(String couponCode, BigDecimal discountAmount, Timestamp validUntil) {
-        this.couponCode = couponCode;
-        this.validUntil = validUntil;
+            @NotNull
+     String id;
+     int discount;
+     Date expiryDate;
+     @JsonIgnore
+     @ManyToOne(joinColumn = "sellerId")
+    Seller seller;
+    public Coupon(String id, int discountAmount, Timestamp expiryDate) {
+        this.id = id;
+        this.expiryDate = expiryDate;
         this.discount = discountAmount;
     }
-    public Coupon(String couponCode) {
-        this.couponCode=couponCode;
+    public Coupon(String id) {
+        this.id = id;
     }
     public Coupon() {
     }
-
-    public Coupon(String couponCode, Seller seller) {
-        this(couponCode);
-        this.sellerId=seller;
+    public Seller getSeller() {
+        return seller;
     }
-
+    public void setSeller(Seller seller) {
+        this.seller = seller;
+    }
     // Getters and setters (including dirty flags)
-    public String getCouponCode() {
-        return couponCode;
+    public String getId() {
+        return id;
     }
-    public void setCouponCode( String code) {
-        this.couponCode = code;
-        this.couponCodeDirty = true;
+    public void setId(String code) {
+        this.id = code;
     }
-    public java.math.BigDecimal getDiscount() {
+    public int getDiscount() {
         return discount;
     }
-    public void setDiscount( java.math.BigDecimal discountAmount) {
+    public void setDiscount( int discountAmount) {
         this.discount = discountAmount;
-        this.discountDirty = true;
     }
 
-    public Timestamp getValidUntil() {
-        return validUntil;
+    public Date getExpiryDate() {
+        return expiryDate;
     }
 
-    public void setValidUntil(Timestamp validUntil) {
-        this.validUntil = validUntil;
-        this.validUntilDirty = true;
+    public void setExpiryDate(Date expiryDate) {
+        this.expiryDate = expiryDate;
     }
-    public Seller getSellerId(){
-
-        return (Seller) this.sellerId.fetch();
-    }
-    public void setSellerId(Seller seller){
-        this.sellerId=seller;
-        this.sellerIdDirty=true;
-    }
-
     // Equals and hashCode methods
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
+        if (o == null || !getClass().isAssignableFrom(o.getClass())) return false;
         Coupon coupon = (Coupon) o;
-
-        return Objects.equals(couponCode, coupon.couponCode);
+        return Objects.equals(getId(), coupon.getId());
     }
 
     @Override
     public int hashCode() {
-        return couponCode.hashCode();
+        return id.hashCode();
     }
 }

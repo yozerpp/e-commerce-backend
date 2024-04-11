@@ -1,0 +1,139 @@
+### Sepeti Görüntüle
+GET http://localhost:8080/test/api/cart
+Content-Type: application/json
+
+//{
+//  "cartId": 176,
+//  "total": 2800.00,
+//  "ordered": false,
+//  "sales": [
+//    {
+//      "product": {
+//        "productId": 12
+//      },
+//      "quantity": 14,
+//      "price": 200.00
+//    }
+//  ]
+//}
+### Sepete ekle
+POST http://localhost:8080/test/api/cart?product=23&increment=true&coupon=AAAAAAAAAAAAAAAAAAAAAAEZZZZZZZZZ
+### Sepete Ekle
+POST http://localhost:8080/test/api/cart
+Content-Type: application/json
+# STATUS=201(Created)
+
+{
+  "product": {"id":  23},
+  "coupon": {"id": "AAAAAAAAAAAAAAAAAAAAAAEZZZZZZZZZ"},
+  "quantity" :15
+}
+
+### Sepeti temizle
+DELETE http://localhost:8080/test/api/cart
+# 202 (Accepted)
+### Kayıtlı olmayan kullanıcının siparişleri (email parametre)
+GET http://localhost:8080/test/api/order?email=a@ab.com
+#[
+#  {
+#    "orderId": 36,
+#    "cart": null,
+#    "creationDate": null,
+#    "status": "Completed",
+#    "paymentMethod": "OnlineCard",
+#    "deliveryAddress": {
+#      "street": "Fatih",
+#      "city": "trabzon",
+#      "district": null,
+#      "buildingNo": "13",
+#      "innerDoorNo": "15"
+#    },
+#    "paid": 2800.00,
+#    "email": "a@ab.com",
+#    "customer": {
+#      "customerId": 150
+#    }
+#  }
+#]
+### Kayıtlı kullanıcı siparişleri
+GET http://localhost:8080/test/api/order
+
+# {
+#  "orderId": 10,
+#  "cartId": {
+#    "cartId": 22,
+#    "total": 2500000.00,
+#    "ordered": 1
+#  },
+#  "dateOrdered": 1702220141000,
+#  "orderStatus": "InProgress",
+#  "paymentMethod": "onlineCard",
+#  "deliveryAddress": "adress",
+#  "paid": 2500000.00
+#}
+### kayıtsız müşteri için sepeti satın al
+POST http://localhost:8080/test/api/order
+Content-Type: application/json
+# 201
+
+{
+  "deliveryAddress": {
+    "city": "trabzon",
+    "street": "Kalkınma",
+    "buildingNo": "13",
+    "innerDoorNo": "15"},
+  "paymentMethod": "OnlineCard",
+  "email": "a@ab.com"
+}
+
+
+### Kayıtlı müşteri için sepeti satın al
+POST http://localhost:8080/test/api/order
+Content-Type: application/json
+
+# 201
+{
+  "deliveryAddress": {
+    "city": "Trabzon",
+  "street": "Konaklar",
+  "buildingNo": "14",
+  "innerDoorNo": "12"},
+  "paymentMethod": "OnlineCard"
+}
+
+### KAyıtlı kullanıcı için siparişi güncelleme
+PUT http://localhost:8080/test/api/order/4002
+Content-Type: application/json
+# eğer güncellenen siparişin status'u "Completed" veya "Canceled" ise 409
+# eğer sipariş hali hazırda OnlineCard methodu ile ödenmiş ise 406
+# başırılı ise 202
+
+{
+  "deliveryAddress" : {
+    "city": "trabzon",
+    "street": "Fatih",
+    "buildingNo": "13",
+    "innerDoorNo": "15"},
+  "paymentMethod" : "OnlineCard",
+  "status": "Completed"
+}
+### Kayıtısız kullanııcı için siparişi güncelleme
+PUT http://localhost:8080/test/api/order/4001
+Content-Type: application/json
+# eğer güncellenen siparişin status'u "Completed" veya "Canceled" ise 409
+# eğer sipariş hali hazırda OnlineCard methodu ile ödenmiş ise 406
+# başırılı ise 202
+
+{
+  "deliveryAddress" : {
+    "city": "trabzon",
+    "street": "Fatih",
+    "buildingNo": "13",
+    "innerDoorNo": "15"},
+  "paymentMethod" : "OnlineCard",
+  "status": "Canceled",
+  "email": "a@ab.com"
+}
+
+### siparişi iptal et
+DELETE http://localhost:8080/test/api/order/38

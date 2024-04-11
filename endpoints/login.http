@@ -1,0 +1,14 @@
+### Giriş yap
+POST http://localhost:8080/test/api/login
+Content-Type: application/json
+# Kullanıcı bulunamzsa 404, varse anasayfaya yönlendirir ("/")
+
+{
+  "email": "ghgfhf@ffb.com",
+  "password": "Asdsadsa213123"
+}
+
+### Çıkış yap
+DELETE http://localhost:8080/test/api/login
+Content-Type: application/json
+# 200

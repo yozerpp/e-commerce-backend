@@ -1,0 +1,54 @@
+### Kullanıcı bilgilerini görüntüle
+GET http://localhost:8080/test/api/user
+Content-Type: application/json
+#{
+#  "customerId": 156,
+#  "email": "ghgfhf@qwe.com",
+#  "password": "asdsadsa213123",
+#  "firstName": "qwe",
+#  "birthDate": 1040774400000,
+#  "lastName": "asggd",
+#  "address": null,
+#  "cart": {
+#    "cartId": 176,
+#    "total": 2800.00,
+#    "ordered": false,
+#    "sales": [
+#      {
+#        "product": {
+#          "productId": 12
+#        },
+#        "quantity": 14,
+#        "price": 200.00
+#      }
+#    ]
+#  }
+#}
+### Yeni kullanıcı kaydet
+POST http://localhost:8080/test/api/user
+Content-Type: application/json
+Content-Encoding: utf-8
+# başarılıysa "/login"e yönlendir kullanıcı adı mevcutsa 409 (conflict)
+
+{
+  "firstName": "sad",
+  "lastName": "fdgdf",
+  "birthDate": "2002-12-26",
+  "email": "ghgfhf@ffb.com",
+  "password": "Asdsadsa213123"
+}
+
+### Kullanıcı bilgilerini güncelle
+PUT http://localhost:8080/test/api/user
+Content-Type: application/json
+Content-Encoding: utf-8
+
+{
+  "firstName": "dsfdsfsddfg",
+  "lastName": "ngh",
+  "birthDate": "2002-12-25"
+}
+
+### Kullanıcı sil
+DELETE http://localhost:8080/test/api/user
+# anasayfaya("/") yönlendir
