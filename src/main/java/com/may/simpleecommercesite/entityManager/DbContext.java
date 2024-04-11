@@ -7,7 +7,6 @@ import com.may.simpleecommercesite.helpers.ErrandBoy;
 import com.may.simpleecommercesite.sqlUtils.StatementBuilder;
 import com.may.simpleecommercesite.sqlUtils.SqlTypeConverter;
 import net.sf.cglib.proxy.*;
-
 import javax.sql.DataSource;
 import java.io.*;
 import java.lang.annotation.Annotation;
