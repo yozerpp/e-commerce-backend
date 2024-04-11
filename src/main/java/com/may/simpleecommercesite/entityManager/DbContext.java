@@ -23,9 +23,9 @@ public class DbContext {
     private static final Class<? extends Annotation>[] notMappedFieldAnnotations= new Class[]{OneToMany.class};
     final ObjectMapper mapper;
     final SqlTypeConverter typeConverter;
-    private final static int CACHE_MAX_SIZE=5000;
+    private final static int CACHE_MAX_SIZE=500;
     private final Set<Object> idCache =Collections.synchronizedSet(new HashSet<>(2000));
-    private final Map<Map<String,Object>, List<Object>> searchCache=new ConcurrentHashMap<>();
+//    private final Map<Map<String,Object>, List<Object>> searchCache=new ConcurrentHashMap<>();
     private final Map<Object, Set<String>> dirtMap=new ConcurrentHashMap<>();
     private final Map<Class<?>, Map<String,String>>  fieldNameMappings=new HashMap<>();
     private DataSource dataSource;
@@ -52,7 +52,7 @@ public class DbContext {
     }
     public <T> List<T> search(Class<T> clazz ,Map<String,Object> params) {
         params= replaceWithColumnName(params, fieldNameMappings.containsKey(clazz)?fieldNameMappings.get(clazz):createColumnNameMapping(clazz));
-        if (clazz.equals(Product.class) && this.searchCache.containsKey(params)) return (List<T>) this.searchCache.get(params);
+//        if (clazz.equals(Product.class) && this.searchCache.containsKey(params)) return (List<T>) this.searchCache.get(params);
         Connection connection= null;
         PreparedStatement statement = null;
         try {
@@ -61,14 +61,14 @@ public class DbContext {
             ResultSet results=statement.executeQuery();
             List<T> entities= createWithResults(clazz, results);
             entities.replaceAll(this::toProxy);
-            this.searchCache.put(params, (List<Object>) entities);
-            if(this.searchCache.size()>CACHE_MAX_SIZE) {
-                synchronized (searchCache) {
-                    Map.Entry<Map<String, Object>, List<Object>> e = this.searchCache.entrySet().stream().findFirst().get();
-                    e.getValue().clear();
-                    this.searchCache.remove(e.getKey());
-                }
-            }
+//            this.searchCache.put(params, (List<Object>) entities);
+//            if(this.searchCache.size()>CACHE_MAX_SIZE) {
+//                synchronized (searchCache) {
+//                    Map.Entry<Map<String, Object>, List<Object>> e = this.searchCache.entrySet().stream().findFirst().get();
+//                    e.getValue().clear();
+//                    this.searchCache.remove(e.getKey());
+//                }
+//            }
             return entities;
         } catch (NoSuchMethodException | SQLException | InvocationTargetException | IllegalAccessException |
                  InstantiationException e) {
@@ -345,10 +345,10 @@ public class DbContext {
             this.dirtMap.forEach((key, value) -> value.clear());
             this.dirtMap.clear();
         }
-        synchronized (searchCache) {
-            this.searchCache.forEach((key, value) -> value.clear());
-            this.searchCache.clear();
-        }
+//        synchronized (searchCache) {
+//            this.searchCache.forEach((key, value) -> value.clear());
+//            this.searchCache.clear();
+//        }
     }
     private static boolean isDefault(Object val){
         return (val == null || val.toString().trim().isEmpty() || ((val instanceof Boolean)) && ((Boolean) val).booleanValue()) || (val instanceof Number && ((Number)val).equals(0));
