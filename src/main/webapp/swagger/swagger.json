@@ -1,0 +1,1347 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Ecommerce",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://ozerpp.me/ecommerce/api"
+    }
+  ],
+  "paths": {
+    "/product": {
+      "get": {
+        "tags": [
+          "product"
+        ],
+        "summary": "Performs a search or gets all products",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search filters",
+            "required": false,
+            "description": "use parameters ending with Low and High to perform range search. All fields are optional",
+            "schema": {
+              "$ref": "#/components/schemas/search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of products",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No match found for filters"
+          }
+        }
+      }
+    },
+    "/product/{productId}": {
+      "get": {
+        "tags": [
+          "product"
+        ],
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/product/{productId}/image": {
+      "get": {
+        "tags": [
+          "product"
+        ],
+        "summary": "Get image(s) of the product",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "null"
+            },
+            "description": "If this param is present in query, all images are returned in a zip file. Otherwise only the thumbnail image is returned as jpeg."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns Jpg or zip data depending on parameter configuration"
+          },
+          "404": {
+            "description": "Product doesnt have an image"
+          }
+        }
+      }
+    },
+    "/product/{productId}/rating": {
+      "get": {
+        "tags": [
+          "rating"
+        ],
+        "summary": "Returns all ratings belonging to the product",
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of ratings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rating"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "rating"
+        ],
+        "summary": "Add rating to the product",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RatingParam"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created the rating"
+          },
+          "400": {
+            "description": "Posted a rating without logging in and without specifying a firstName "
+          },
+          "409": {
+            "description": "Rating posted by same user already exists. Note this is tracked by cookies so you can't send ratings with different surname and lastname without logging in"
+          }
+        }
+      }
+    },
+    "/product/{productId}/rating/{ratingId}": {
+      "get": {
+        "summary": "Get the rating from the product",
+        "tags": [
+          "rating"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ratingId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rating",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rating"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Edit a previously posted rating",
+        "tags": [
+          "rating"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "required": true,
+            "name": "productId",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "required": true,
+            "name": "ratingId",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RatingParam"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Succesful"
+          },
+          "404": {
+            "description": "No rating with the ratingId"
+          },
+          "401": {
+            "description": "Owner of the rating is not the registered user or the unregistered user(tracked by cookies, note this means you cant alter a rating once you reset your cookies)"
+          }
+        }
+      },
+      "delete": {
+        "summary": "delete the rating",
+        "tags": [
+          "rating"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "ratingId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Succesful"
+          },
+          "401": {
+            "description": "Owner of the rating is not the registered user or the unregistered user(tracked by cookies, note this means you cant alter a rating once you reset your cookies)"
+          }
+        }
+      }
+    },
+    "/product/{productId}/rating/{ratingId}/vote": {
+      "post": {
+        "tags": ["rating"],
+        "summary": "Add or edit a rating vote",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ratingId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "up",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "If a nonNull value for up is present rating is upvoted else downvoted"
+          }
+        ],
+        "description": "Attempting to vote when already voted overwrites the existing vote. This is also tracked with cookies",
+        "responses": {
+          "200": {
+            "description": "succesful"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["rating"],
+        "summary": "delete a vote",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ratingId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "succesful"
+          },
+          "404": {
+            "description": "No vote is present by the current customer on the rating"
+          }
+        }
+      }
+    },
+    "/cart": {
+      "get": {
+        "tags": ["cart"],
+        "summary": "get contents of cart",
+        "description": "Cart is tracked by cookie if user is unregistered, if it registers cart associated with the registered user is used instead.(until it logs out)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "sucessful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cart"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["cart"],
+        "summary": "Add an item to cart or edit an existing item",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "product",
+            "description": "id of the product",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "increment",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Mode. It adds the product to cart if product previously didnt exist on cart, or deletes the item if quantity falls to zero",
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "coupon",
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "description": "coupon to be used"
+          }
+        ],
+        "description": "Either body parameters or both of the query parameters should be used.",
+        "responses": {
+          "200": {
+            "description": "Successful"
+          },
+          "406":{
+            "description": "Owner of coupon isn't seller of product"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["cart"],
+        "summary": "clears the cart",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Succesful"
+          }
+        }
+      }
+    },
+    "/order": {
+      "get": {
+        "tags": ["order"],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "email",
+            "required": false,
+            "description": "get all invoices that are signed by unregistered user with the email in the parameters. Note: No email authorization is performed so anyone can see any order that belong to an unregistered user. this parameter cacn be ommitted for logged in users.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "if user isn't logged in and ommitted the email field in query"
+          },
+          "404": {
+            "description": "if no order made by an unregistered user is found for the email or registered user has no order"
+          }
+        }
+      },
+      "post": {
+        "tags": ["order"],
+        "summary": "creates and order with contents of the current cart",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderParam"
+              }
+            }
+          },
+          "description": "like for the get method, email field can be omitted if request is made by a registered customer"
+        },
+        "responses": {
+          "200": {
+            "description": "Successful"
+          },
+          "400": {
+            "description": "if email is omitted and user submitting the order is unregistered"
+          }
+        }
+      }
+    },
+    "/order/{orderId}": {
+      "put": {
+        "tags": ["order"],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Order"
+              }
+            }
+          },
+          "description": "email field requirement is same as post"
+        },
+        "responses": {
+          "400": {
+            "description": "if email field is omitted and user is not logged in"
+          },
+          "401": {
+            "description": "if request is made by unregistered user, either email in request body doesnt match with the email entered in given orders creation or emails do match but order belongs to a registered user. if request is made by a registered user it means order belong to a different user"
+          },
+          "406": {
+            "description": "order is in complete or canceled status"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["order"],
+        "summary": "cancels the order",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "description": "cancels the order associated with the current customer. Note: if an unregistered customer clears cookies he can't access this method(can still cancel through put)",
+        "responses": {
+          "401": {
+            "description": "owner of the order is not the current customer (tracks unregistered customers as well)"
+          },
+          "406": {
+            "description": "owner is already complete or canceled"
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "tags": [
+          "customer"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "email",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "password",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "summary": "login",
+        "responses": {
+          "404": {
+            "description": "no customer for credentials"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["customer"],
+        "summary": "logout",
+        "responses": {
+          "200": {
+            "description": "succesfull"
+          },
+          "401": {
+            "description": "not logged in"
+          }
+        }
+      }
+    },
+    "/user": {
+      "get": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "get user details",
+        "responses": {
+          "200": {
+            "description": "logged in customer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "not logged in"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "create an account",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerParam"
+              }
+            }
+          },
+          "description": "firstName, lastName, email and password fields should be specified email has to be a valid email address and password has to contain 12 characters, 1 capital letter and 1 small letter"
+        },
+        "responses": {
+          "400": {
+            "description": "if email or password doesnt fit the required format"
+          },
+          "406": {
+            "description": "one of the required fields are omitted"
+          },
+          "409": {
+            "description": "an account with specified email exists"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "edit the logged in user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerParam"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "description": "email or credential format is not valid (specified in post method specification)"
+          },
+          "401": {
+            "description": "not logged in"
+          },
+          "406": {
+            "description": "one of the required fields is omitted(specified in post methods specification)"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "delete logged in account",
+        "responses": {
+          "401": {
+            "description": "not logged in"
+          }
+        }
+      }
+    },
+    "/seller": {
+      "get": {
+        "tags": ["seller"],
+        "summary": "returns all sellers",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of sellers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Seller"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/seller/{sellerId}": {
+      "get": {
+        "tags": ["seller"],
+        "summary": "Returns the seller",
+        "parameters": [{
+          "in": "path",
+          "name": "sellerId",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }],
+        "responses": {
+          "200": {
+            "description": "Seller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Seller"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/seller/{sellerId}/coupons": {
+      "get": {
+        "tags": ["seller", "coupon"],
+        "summary": "returns all coupons belonging to seller",
+        "parameters": [
+          {
+            "in": "path",
+            "required": true,
+            "name": "sellerId",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of coupons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Coupon"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metadata/types/{entity}": {
+      "get": {
+        "tags": [
+          "metadata"
+        ],
+        "summary": "get schema info",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity",
+            "required": true,
+            "description": "name of the requested entity",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "fieldName: fieldType"
+          },
+          "404": {
+            "description": "no domain object specified in path is found"
+          }
+        }
+      }
+    },
+    "/metadata/values/{entity}": {
+      "get": {
+        "tags": [
+          "metadata"
+        ],
+        "summary": "get all registered instances of a domain object. It's only valid for categorical data like brand, category etc.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity",
+            "required": true,
+            "description": "name of the requested entity",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "same schema that is used to represent the requested requested resource"
+          },
+          "404": {
+            "description": "no domain object specified in path is found"
+          },
+          "406": {
+            "description": "this resource is not open for inspection"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Unique identifier for the product"
+          },
+          "title": {
+            "type": "string",
+            "description": "The title of the product"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the product"
+          },
+          "originalPrice": {
+            "type": "number",
+            "format": "double",
+            "description": "Original price of the product"
+          },
+          "discount": {
+            "type": "integer",
+            "description": "Discount percentage for the product"
+          },
+          "avgRating": {
+            "type": "number",
+            "format": "double",
+            "description": "Average rating of the product"
+          },
+          "ratingCount": {
+            "type": "integer",
+            "description": "Number of ratings for the product"
+          },
+          "seller": {
+            "$ref": "#/components/schemas/Seller"
+          },
+          "brand": {
+            "$ref": "#/components/schemas/Brand"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "finalPrice": {
+            "type": "number",
+            "format": "double",
+            "description": "Final price of the product after discount"
+          },
+          "saleCount": {
+            "type": "integer",
+            "description": "Number of times the product has been sold"
+          }
+        }
+      },
+      "Cart": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique identifier for the cart"
+          },
+          "total": {
+            "type": "number",
+            "format": "double",
+            "description": "Total price of items in the cart"
+          },
+          "ordered": {
+            "type": "boolean",
+            "description": "Indicates whether the cart has been ordered"
+          },
+          "sales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Sale"
+            }
+          }
+        }
+      },
+      "Customer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique identifier for the customer"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address of the customer"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password of the customer"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "First name of the customer"
+          },
+          "birthDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Birth date of the customer"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Last name of the customer"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "cart": {
+            "$ref": "#/components/schemas/Cart"
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique identifier for the order"
+          },
+          "cart": {
+            "$ref": "#/components/schemas/Cart"
+          },
+          "creationDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date when the order was created"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "InProgress",
+              "Paid",
+              "Shipped",
+              "Delivered"
+            ],
+            "description": "Current status of the order"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "description": "Payment method used for the order",
+            "enum": ["OnlineCard", "AtDoorCash", "AtDoorCard"]
+          },
+          "deliveryAddress": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "paid": {
+            "type": "number",
+            "format": "double",
+            "description": "Amount paid for the order"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address associated with the order"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/Customer"
+          }
+        }
+      },
+      "Rating": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique identifier for the rating"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/Customer"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "First name of the person giving the rating"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Last name of the person giving the rating"
+          },
+          "dateRated": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date when the rating was given"
+          },
+          "rating": {
+            "type": "number",
+            "format": "double",
+            "description": "Numeric rating given by the customer"
+          },
+          "comment": {
+            "type": "string",
+            "description": "Comment associated with the rating"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "Indicates whether the rating has been confirmed"
+          },
+          "upVotes": {
+            "type": "integer",
+            "description": "Number of upvotes for the rating"
+          },
+          "downVotes": {
+            "type": "integer",
+            "description": "Number of downvotes for the rating"
+          }
+        }
+      },
+      "Sale": {
+        "type": "object",
+        "properties": {
+          "cart": {
+            "$ref": "#/components/schemas/Cart"
+          },
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Quantity of the product in the sale"
+          },
+          "coupon": {
+            "$ref": "#/components/schemas/Coupon"
+          },
+          "price": {
+            "type": "number",
+            "format": "double",
+            "description": "Price of the product in the sale"
+          },
+          "baseTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "finalTotal": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "Seller": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique identifier for the seller"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the seller"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          }
+        }
+      },
+      "RatingVote": {
+        "type": "object",
+        "properties": {
+          "rating": {
+            "$ref": "#/components/schemas/Rating"
+          },
+          "vote": {
+            "type": "string",
+            "enum": [
+              "UPVOTE",
+              "DOWNVOTE"
+            ],
+            "description": "Type of vote"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/Customer"
+          }
+        }
+      },
+      "Coupon": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the coupon"
+          },
+          "discount": {
+            "type": "integer",
+            "description": "Discount percentage offered by the coupon"
+          },
+          "expiryDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Expiry date of the coupon"
+          }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique identifier for the category"
+          },
+          "parent": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the category"
+          },
+          "subCategories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            }
+          }
+        }
+      },
+      "Brand": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique identifier for the brand"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the brand"
+          }
+        }
+      },
+      "Address": {
+        "type": "object",
+        "properties": {
+          "street": {
+            "type": "string",
+            "description": "Street name"
+          },
+          "city": {
+            "type": "string",
+            "description": "City name"
+          },
+          "district": {
+            "type": "string",
+            "description": "District name"
+          },
+          "buildingNo": {
+            "type": "string",
+            "description": "Building number"
+          },
+          "innerDoorNo": {
+            "type": "string",
+            "description": "Inner door number"
+          }
+        }
+      },
+      "RatingParam": {
+        "type": "object",
+        "properties": {
+          "rating": {
+            "type": "number",
+            "format": "double",
+            "description": "Numeric rating"
+          },
+          "comment": {
+            "type": "string",
+            "description": "Comment associated with the rating"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "First name, required if poster is an unregistered customer"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Last name, required if poster is an unregistered customer"
+          }
+        }
+      },
+      "OrderParam": {
+        "type": "object",
+        "properties": {
+          "deliveryAddress": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "description": "Payment method",
+            "enum": ["OnlineCard", "AtDoorCash", "AtDoorCard"]
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address, can be omitted when posted by a registered customer"
+          }
+        }
+      },
+      "CustomerParam": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "description": "First name"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Last name"
+          },
+          "birthDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of birth"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password"
+          }
+        }
+      },
+      "search": {
+        "type": "object",
+        "description": "Query parameters for filtering and sorting products",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Unique identifier for the product"
+          },
+          "title": {
+            "type": "string",
+            "description": "The title of the product"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the product"
+          },
+          "originalPriceLow": {
+            "type": "number",
+            "format": "double",
+            "description": "Original price lower bound"
+          },
+          "originalPriceHigh": {
+            "type": "number",
+            "format": "double",
+            "description": "Original price upper bound",
+            "default": 100000000000000
+          },
+          "originalPriceAsc": {
+            "type": "boolean",
+            "description": "Sort by original price in ascending order"
+          },
+          "originalPriceDesc": {
+            "type": "boolean",
+            "description": "Sort by original price in descending order"
+          },
+          "discount": {
+            "type": "integer",
+            "description": "Discount percentage for the product"
+          },
+          "avgRatingLow": {
+            "type": "number",
+            "format": "double",
+            "description": "Average rating lower bound"
+          },
+          "avgRatingHigh": {
+            "type": "number",
+            "format": "double",
+            "description": "Average rating upper bound",
+            "default": 5
+          },
+          "avgRatingAsc": {
+            "type": "boolean",
+            "description": "Sort by average rating in ascending order"
+          },
+          "avgRatingDesc": {
+            "type": "boolean",
+            "description": "Sort by average rating in descending order"
+          },
+          "ratingCountLow": {
+            "type": "integer",
+            "description": "Rating count lower bound"
+          },
+          "ratingCountHigh": {
+            "type": "integer",
+            "description": "Rating count upper bound",
+            "default": 10000000000000
+          },
+          "ratingCountDesc": {
+            "type": "boolean"
+          },
+          "ratingCountAsc": {
+            "type": "boolean"
+          },
+          "saleCountAsc": {
+            "type": "boolean"
+          },
+          "saleCountDesc": {
+            "type": "boolean"
+          },
+          "saleCountLow": {
+            "type": "integer",
+            "description": "Sale count lower bound"
+          },
+          "saleCountHigh": {
+            "type": "integer",
+            "description": "Sale count upper bound",
+            "default": 1000000000000
+          }
+        }
+      }
+    }
+  }
+}
