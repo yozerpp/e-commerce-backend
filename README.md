@@ -12,7 +12,7 @@
 Welcome to the E-commerce Backend project! This project aims to provide robust backend support for e-commerce websites, focusing primarily on customer interactions.
 
 ## Demo
-[Demo link](https://www.yozer.me/e-commerce) you can test the server by interacting with Swagger UI. Swagger for this server is designed to be an API interaction tool like Postman rather than a documentation tool.
+[Demo link](https://www.yozer.me/ecommerce) you can test the server by interacting with Swagger UI. Swagger for this server is designed to be an API interaction tool like Postman rather than a documentation tool.
 
 ## Functionalities
 The server supports most of the functionality associated with customers in an e-commerce domain. However, it does not support functionality for seller interactions. Below are supported functionalities
