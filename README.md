@@ -31,7 +31,3 @@ This project makes use of several frameworks and libraries to facilitate its fun
 - javax libraries for various utilities
 
 Additionally, the project includes a homemade EntityManager-like class for database interactions, located at `beans/DbContext`.
-
-## Known Issues
-### Cache Incoherency
-Elements in the enpoints that return a list of resources won't reflect changes if one of their associated resource is changed, this is because a lack of mapping between the search cache and... anything else really.
