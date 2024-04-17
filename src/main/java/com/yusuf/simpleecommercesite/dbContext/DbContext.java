@@ -268,7 +268,9 @@ public class DbContext {
         }
     }
     private Connection getConnection() throws SQLException {
-        if (this.dataSource!=null) return dataSource.getConnection();
+        if (this.dataSource!=null) {
+            return dataSource.getConnection();
+        }
         else if (this.connectionn!=null) return this.connectionn;
         else throw new RuntimeException("NO CONNECTION SOURCE");
     }

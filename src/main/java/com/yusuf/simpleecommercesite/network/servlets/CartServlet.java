@@ -32,8 +32,8 @@ public class CartServlet extends ApiServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json");
         Cart cart = getCart(req.getSession());
-        StringWriter out = new StringWriter();
-        jsonMapper.writeValue(out, cart);
+//        StringWriter out = new StringWriter();
+//        jsonMapper.writeValue(out, cart);
         jsonMapper.writeValue(resp.getWriter(), cart);
     }
 

@@ -14,6 +14,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.source>1.8</maven.compiler.source>
         <junit.version>5.9.2</junit.version>
+        <context-path>ecommerce/api</context-path>
     </properties>
 
     <dependencies>
@@ -193,7 +194,7 @@
                                 <argument>-File</argument>
                                 <argument>deploy.ps1</argument>
                                 <argument>${project.build.directory}/${project.build.finalName}.war</argument>
-                                <argument>${project.name}</argument>
+                                <argument>${context-path}</argument>
                             </arguments>
                         </configuration>
                     </execution>

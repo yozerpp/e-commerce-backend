@@ -25,4 +25,4 @@ if ($null -eq $resp){
 }
 Write-Output "uploaded the file"
 $arg=$resp.link
-ssh root@185.87.252.50 -p 22666 "./redeploy.sh $arg $outputPath"
+ssh root@localhost -p 22 "./redeploy.sh $arg $outputPath"
