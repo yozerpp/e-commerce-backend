@@ -1,4 +1,4 @@
-package com.yusuf.simpleecommercesite.network.servlets.api;
+package com.yusuf.simpleecommercesite.network.servlets;
 
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.yusuf.simpleecommercesite.entities.Cart;
@@ -15,9 +15,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static com.yusuf.simpleecommercesite.network.servlets.api.ApiServlet.apiPath;
+import static com.yusuf.simpleecommercesite.network.servlets.ApiServlet.apiRoot;
 
-@WebServlet(urlPatterns = {apiPath+  "/order",apiPath+ "/order/*"}, name = "Invoice",asyncSupported = true)
+@WebServlet(urlPatterns = {apiRoot +  "/order", apiRoot + "/order/*"}, name = "Invoice",asyncSupported = true)
 public class InvoiceServlet extends ApiServlet {
     ObjectReader invoiceReader;
     @Override

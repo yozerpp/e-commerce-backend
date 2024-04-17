@@ -1,4 +1,4 @@
-package com.yusuf.simpleecommercesite.network.servlets.api;
+package com.yusuf.simpleecommercesite.network.servlets;
 
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.yusuf.simpleecommercesite.entities.*;
@@ -20,10 +20,10 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import static com.yusuf.simpleecommercesite.network.servlets.api.ApiServlet.apiPath;
+import static com.yusuf.simpleecommercesite.network.servlets.ApiServlet.apiRoot;
 
-@WebServlet(urlPatterns = {apiPath +"/product",apiPath + "/product/*"}, name = "Product", asyncSupported = true)
-public class ProductServlet extends ApiServlet {
+@WebServlet(urlPatterns = {apiRoot +"/product", apiRoot + "/product/*"}, name = "Product", asyncSupported = true)
+public class    ProductServlet extends ApiServlet {
     ObjectReader productReader;
     ObjectReader ratingReader;
     ObjectReader ratingVoteReader;
@@ -41,7 +41,7 @@ public class ProductServlet extends ApiServlet {
         resp.setContentType("application/json");
         String pathInfo=req.getPathInfo();
         if (pathInfo==null) { // search
-            resp.addHeader("Cache-Control", "public, max-age=7200");
+            resp.addHeader("Cache-Control", "public, must-revalidate, max-age=30");
             Map<String, Object> params = new HashMap<>();
             for (Map.Entry<String, String[]> param: req.getParameterMap().entrySet())
                 if(param.getValue().length==1)
@@ -68,7 +68,7 @@ public class ProductServlet extends ApiServlet {
                 if(rating==null) resp.setStatus(404);
                 else jsonMapper.writeValue(resp.getWriter(), rating);
             }else if (pathInfo.matches(".*\\d+/image")){ // images
-                resp.addHeader("Cache-Control", "public, max-age=7200");
+                resp.addHeader("Cache-Control", "public, max-age=" + 3600*24);
                 List<Image> images= dbContext.findById(Product.class, productId).getImages();
                 if (images==null || images.isEmpty()) {
                     resp.setStatus(HttpServletResponse.SC_NOT_FOUND);

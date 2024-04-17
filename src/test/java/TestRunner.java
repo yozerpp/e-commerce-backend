@@ -1,51 +1,45 @@
+//import com.fasterxml.jackson.databind.JsonNode;
 //import com.fasterxml.jackson.databind.ObjectMapper;
-//import com.may.simpleecommercesite.beans.DbContext;
-//import com.may.simpleecommercesite.entities.embedded.Address;
-//import com.may.simpleecommercesite.entities.*;
-//import com.may.simpleecommercesite.sqlUtils.StatementBuilder;
+//import com.fasterxml.jackson.databind.json.JsonMapper;
+//import com.yusuf.simpleecommercesite.dbContext.DbContext;
+//import com.yusuf.simpleecommercesite.entities.embedded.Address;
+//import com.yusuf.simpleecommercesite.entities.*;
+//import com.yusuf.simpleecommercesite.dbContext.sqlUtils.StatementBuilder;
 //import org.apache.commons.dbcp2.BasicDataSource;
 //import org.junit.jupiter.api.AfterAll;
 //import org.junit.jupiter.api.Assertions;
 //import org.junit.jupiter.api.BeforeAll;
 //import org.junit.jupiter.api.Test;
 //import com.mysql.cj.jdbc.Driver;
+//
+//import javax.sql.DataSource;
+//import java.io.File;
+//import java.io.IOException;
+//import java.net.URISyntaxException;
+//import java.net.URL;
 //import java.sql.*;
 //import java.util.Map;
 //
 //public class TestRunner {
 //    static DbContext dbContext;
-//    static Connection connection;
+//    static DataSource dataSource;
+//    static JsonNode data;
+//    static final JsonMapper json= JsonMapper.builder().build();
+//    static final URL DATA_FILE=TestRunner.class.getClassLoader().getResource("testData.json");
 //    @BeforeAll
-//    public static void createContext() throws SQLException {
+//    public static void createContext() throws SQLException, IOException {
+//        data=json.readTree(DATA_FILE);
 //        BasicDataSource dataSource=new BasicDataSource();
 //        dataSource.setDriver(new Driver());
 //        dataSource.setUrl("jdbc:mysql://localhost:3306/ecommerce");
 //        dataSource.setUsername("root");
 //        dataSource.setPassword("123456");
-//        connection= dataSource.getConnection();
+//        TestRunner.dataSource=dataSource;
 //        dbContext=new DbContext(new ObjectMapper(), dataSource);
 //    }
-//    @Test
-//    public void StatementsTest() throws SQLException {
-//        StatementBuilder builder= new StatementBuilder(StatementBuilder.StatementType.SELECT);
-//        PreparedStatement statement;
-//        builder.table(Product.class.getSimpleName());
-//        ResultSet rs= builder.columns("productId").where("productId", 1).build(connection).executeQuery();
-//        rs.next();
-//        Assertions.assertEquals(1, rs.getInt("productId"));
-//        rs.close();
-//        builder=new StatementBuilder(StatementBuilder.StatementType.UPDATE).table(Product.class.getSimpleName()).set("title", "anan").where("productId", 1);
-//        Assertions.assertTrue(builder.build(connection).executeUpdate()>0);
-//        statement=new StatementBuilder(StatementBuilder.StatementType.INSERT).table(Cart.class.getSimpleName()).build(connection);
-//        statement.executeUpdate();
-//        rs=statement.getGeneratedKeys();
-//        rs.next();
-//        Assertions.assertTrue(rs.getInt(1)!=0);
-////        rs=new CompiledStatement(CompiledStatement.StatementType.INSERT, RegisteredCustomer.class.getSimpleName()).columns("email", "credential", "firstName", "lastName", "dateOfBirth").values("ggfgdfgdfgf@htr.com", "DFDSS2312312", "AASD", "ADSAD", new Timestamp(System.currentTimeMillis())).execute(connection);
-////        rs.next();
-////        Assertions.assertTrue(rs.getInt(1)!=0 );
-////        rs.close();
-////        Assertions.assertTrue(new CompiledStatement(CompiledStatement.StatementType.DELETE, RegisteredCustomer.class.getSimpleName()).where("email","a@b.com").executeUpdate(connection)>0);
+//    @AfterAll
+//    public static void saveTestData() throws URISyntaxException, IOException {
+//        json.writer().writeValue(new File(DATA_FILE.toURI()), data);
 //    }
 //    @Test
 //    public void dbContextTests() throws SQLException {

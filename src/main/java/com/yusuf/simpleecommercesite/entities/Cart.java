@@ -2,7 +2,6 @@ package com.yusuf.simpleecommercesite.entities;
 
 import com.fasterxml.jackson.annotation.JsonFilter;
 import com.yusuf.simpleecommercesite.entities.annotations.*;
-
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;

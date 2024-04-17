@@ -1,4 +1,4 @@
-package com.yusuf.simpleecommercesite.network.servlets.api;
+package com.yusuf.simpleecommercesite.network.servlets;
 
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
@@ -16,9 +16,9 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Objects;
 
-import static com.yusuf.simpleecommercesite.network.servlets.api.ApiServlet.apiPath;
+import static com.yusuf.simpleecommercesite.network.servlets.ApiServlet.apiRoot;
 
-@WebServlet(urlPatterns = { apiPath+"/cart"}, name = "Cart",asyncSupported = true)
+@WebServlet(urlPatterns = { apiRoot +"/cart"}, name = "Cart",asyncSupported = true)
 public class CartServlet extends ApiServlet {
     ObjectReader saleReader;
 

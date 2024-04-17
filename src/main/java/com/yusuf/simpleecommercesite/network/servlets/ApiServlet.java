@@ -1,4 +1,4 @@
-package com.yusuf.simpleecommercesite.network.servlets.api;
+package com.yusuf.simpleecommercesite.network.servlets;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yusuf.simpleecommercesite.entities.annotations.Cookie;
@@ -22,11 +22,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
-public class ApiServlet extends HttpServlet {
+public abstract class ApiServlet extends HttpServlet {
     //    protected Integer activeRequest=0;
-    public static final String apiPath="ecommerce/api";
+    public static final String apiRoot ="";
     protected volatile boolean destroying;
-    protected static final int maxThreads = 50;
+    protected static final int maxThreads = 150;
     protected final Semaphore activeRequest = new Semaphore(maxThreads);
     protected DbContext dbContext;
     protected ObjectMapper jsonMapper;
@@ -63,7 +63,7 @@ public class ApiServlet extends HttpServlet {
     protected synchronized void finishService() {
         synchronized (activeRequest) {
             activeRequest.release();
-            activeRequest.notifyAll();
+            activeRequest.notify();
         }
     }
 
@@ -71,7 +71,7 @@ public class ApiServlet extends HttpServlet {
     public void destroy() {
         destroying = true;
         synchronized (activeRequest) {
-            while (activeRequest.availablePermits() != 50) {
+            while (activeRequest.availablePermits() > 0) {
                 try {
                     activeRequest.wait();
                 } catch (InterruptedException e) {

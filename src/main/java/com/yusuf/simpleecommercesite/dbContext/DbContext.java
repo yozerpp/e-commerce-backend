@@ -56,7 +56,7 @@ public class DbContext {
         PreparedStatement statement = null;
         try {
             connection = getConnection();
-            statement=buildSearchStatement(ErrandBoy.getRealClass(clazz).getSimpleName(), params, connection);
+            statement=buildSearchStatement(ErrandBoy.getRealClass(clazz).getSimpleName().toLowerCase(Locale.ENGLISH), params, connection);
             ResultSet results=statement.executeQuery();
             List<T> entities= createWithResults(clazz, results);
             entities.replaceAll(this::toProxy);
@@ -74,7 +74,8 @@ public class DbContext {
             throw new RuntimeException(e);
         } finally {
             try {
-                statement.close();
+                if(statement!=null)
+                    statement.close();
                 close(connection);
             } catch (SQLException e) {
                 throw new RuntimeException(e);
@@ -123,7 +124,8 @@ public class DbContext {
             e.printStackTrace(System.err);
             throw new RuntimeException(e);
         }finally {
-            statement.close();
+            if(statement!=null)
+                statement.close();
             close(connection);
         }
     }
@@ -157,7 +159,8 @@ public class DbContext {
         } catch (InvocationTargetException | IllegalAccessException e) {
             throw new RuntimeException(e);
         } finally {
-            statement.close();
+            if(statement!=null)
+                statement.close();
             close(connection);
         }
     }
@@ -176,7 +179,8 @@ public class DbContext {
         } catch (SQLException | InvocationTargetException | IllegalAccessException e) {
             throw new RuntimeException(e);
         } finally {
-            statement.close();
+            if(statement!=null)
+                statement.close();
             close(connection);
         }
         this.idCache.add(entity);
@@ -219,7 +223,8 @@ public class DbContext {
     }
     private void close(Connection connection) throws SQLException {
         if (!connectionMode)
-            connection.close();
+            if(connection!=null)
+                connection.close();
     }
     public <T> T fetchLOb(T entity, String fieldName){
         Connection connection=null;
@@ -234,7 +239,8 @@ public class DbContext {
             throw new RuntimeException(e);
         }finally {
              try {
-                 statement.close();
+                 if(statement!=null)
+                     statement.close();
                  close(connection);
              } catch (SQLException e){throw new RuntimeException(e);}
          }

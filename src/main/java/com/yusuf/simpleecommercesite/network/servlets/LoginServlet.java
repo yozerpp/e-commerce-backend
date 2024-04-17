@@ -1,4 +1,4 @@
-package com.yusuf.simpleecommercesite.network.servlets.api;
+package com.yusuf.simpleecommercesite.network.servlets;
 
 
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -13,9 +13,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import static com.yusuf.simpleecommercesite.network.servlets.api.ApiServlet.apiPath;
+import static com.yusuf.simpleecommercesite.network.servlets.ApiServlet.apiRoot;
 
-@WebServlet( urlPatterns = {apiPath+ "/login"}, name = "Login",asyncSupported = true)
+@WebServlet( urlPatterns = {apiRoot + "/login"}, name = "Login",asyncSupported = true)
 public class LoginServlet extends ApiServlet {
     ObjectReader userReader;
     @Override

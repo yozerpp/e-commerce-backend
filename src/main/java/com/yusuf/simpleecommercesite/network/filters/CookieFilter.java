@@ -1,6 +1,6 @@
 package com.yusuf.simpleecommercesite.network.filters;
 
-import com.yusuf.simpleecommercesite.network.servlets.api.ApiServlet;
+import com.yusuf.simpleecommercesite.network.servlets.ApiServlet;
 import com.yusuf.simpleecommercesite.dbContext.DbContext;
 import com.yusuf.simpleecommercesite.entities.Cart;
 import com.yusuf.simpleecommercesite.entities.Customer;

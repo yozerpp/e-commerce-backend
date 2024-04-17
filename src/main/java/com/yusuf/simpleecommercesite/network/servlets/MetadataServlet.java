@@ -1,4 +1,4 @@
-package com.yusuf.simpleecommercesite.network.servlets.api;
+package com.yusuf.simpleecommercesite.network.servlets;
 
 import com.yusuf.simpleecommercesite.entities.annotations.Metadata;
 import com.yusuf.simpleecommercesite.helpers.ErrandBoy;
@@ -16,9 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static com.yusuf.simpleecommercesite.network.servlets.api.ApiServlet.apiPath;
+import static com.yusuf.simpleecommercesite.network.servlets.ApiServlet.apiRoot;
 
-@WebServlet(urlPatterns = apiPath+ "/metadata/*", name = "Metadata",asyncSupported = true)
+@WebServlet(urlPatterns = apiRoot + "/metadata/*", name = "Metadata",asyncSupported = true)
 public class MetadataServlet extends ApiServlet {
     static final String classNamePrefix="com.may.simpleecommercesite.entities.";
     @Override

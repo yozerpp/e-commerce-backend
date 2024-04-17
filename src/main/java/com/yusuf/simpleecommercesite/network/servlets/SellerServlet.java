@@ -1,4 +1,4 @@
-package com.yusuf.simpleecommercesite.network.servlets.api;
+package com.yusuf.simpleecommercesite.network.servlets;
 
 import com.yusuf.simpleecommercesite.entities.Coupon;
 import com.yusuf.simpleecommercesite.entities.Seller;
@@ -12,9 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static com.yusuf.simpleecommercesite.network.servlets.api.ApiServlet.apiPath;
+import static com.yusuf.simpleecommercesite.network.servlets.ApiServlet.apiRoot;
 
-@WebServlet(urlPatterns = {apiPath+  "/seller", apiPath + "/seller/*"},name = "Seller", asyncSupported = true)
+@WebServlet(urlPatterns = {apiRoot +  "/seller", apiRoot + "/seller/*"},name = "Seller", asyncSupported = true)
 public class SellerServlet extends ApiServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {

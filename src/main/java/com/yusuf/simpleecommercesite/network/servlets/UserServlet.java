@@ -1,4 +1,4 @@
-package com.yusuf.simpleecommercesite.network.servlets.api;
+package com.yusuf.simpleecommercesite.network.servlets;
 
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.yusuf.simpleecommercesite.entities.Cart;
@@ -13,9 +13,9 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Objects;
 
-import static com.yusuf.simpleecommercesite.network.servlets.api.ApiServlet.apiPath;
+import static com.yusuf.simpleecommercesite.network.servlets.ApiServlet.apiRoot;
 
-@WebServlet(urlPatterns = {apiPath + "/user"}, name = "User",asyncSupported = true)
+@WebServlet(urlPatterns = {apiRoot + "/user"}, name = "User",asyncSupported = true)
 public class UserServlet extends ApiServlet {
     ObjectReader userReader;
 
