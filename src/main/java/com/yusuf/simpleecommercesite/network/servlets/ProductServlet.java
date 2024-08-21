@@ -2,19 +2,24 @@ package com.yusuf.simpleecommercesite.network.servlets;
 
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.yusuf.simpleecommercesite.entities.*;
+import com.yusuf.simpleecommercesite.helpers.ErrandBoy;
+import com.yusuf.simpleecommercesite.network.dtos.SearchResult;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
+import java.security.URIParameter;
 import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -41,17 +46,18 @@ public class    ProductServlet extends ApiServlet {
         resp.setContentType("application/json");
         String pathInfo=req.getPathInfo();
         if (pathInfo==null) { // search
-            resp.addHeader("Cache-Control", "public, must-revalidate, max-age=30");
+            resp.addHeader("Cache-Control", "private, must-revalidate, max-age=30");
             Map<String, Object> params = new HashMap<>();
             for (Map.Entry<String, String[]> param: req.getParameterMap().entrySet())
                 if(param.getValue().length==1)
                     params.put(param.getKey(), param.getValue()[0]);
                 else throw new RuntimeException("array params aren't supported");
-            List<Product> products = dbContext.search(Product.class, params);
+            SearchResult<Product> products = dbContext.search(Product.class, params);
             if (products != null) jsonMapper.writeValue(resp.getWriter(),products);
             else resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
         }
         else{ // single product
+            resp.addHeader("Cache-Control", "no-cache");
             Matcher productIdFinder=Pattern.compile( "/(\\d+).*").matcher(pathInfo);
             productIdFinder.find();
             int productId= Integer.parseInt(productIdFinder.group(1));
@@ -59,8 +65,9 @@ public class    ProductServlet extends ApiServlet {
                 Product product= dbContext.findById(Product.class, productId);
                 jsonMapper.writeValue(resp.getWriter(), product);
             } else if (pathInfo.matches(".*\\d+/rating")){ // all ratings of a product
-                Map<String, Object> params=Map.of("productId", productId);
-                List<Rating> ratings= dbContext.findById(Product.class, productId).getRatings();
+                Map<String,Object> params = getParams(req);
+                params.put("productId", productId);
+                SearchResult<Rating> ratings= dbContext.search(Rating.class,params );
                 jsonMapper.writeValue(resp.getWriter(), ratings);
             } else if(pathInfo.matches(".*\\d+/rating/\\d+")){ // a rating of a product
                 int ratingId=extractResourceId(pathInfo, 2);
@@ -75,38 +82,45 @@ public class    ProductServlet extends ApiServlet {
                     return;
                 }
                 AsyncContext asyncContext=req.startAsync();
-                Object param= req.getParameter("all");
                 asyncContext.start(()-> {
-                    if (param == null || !((boolean) param)) {
-                        Image i = images.stream().filter(Image::isMain).findFirst().get();
-                        resp.setContentType("image/jpeg");
-                        asyncContext.start(() -> {
+                    HttpServletResponse response = (HttpServletResponse) asyncContext.getResponse();
+                    Object param = asyncContext.getRequest().getParameter("all");
+                    try {
+                        if (param == null) {
+                            Image i = images.stream().min((i1, i2) -> (i1.isMain() ? 1 : (-1))).get();
+                            response.setContentType("image/jpeg");
                             try {
                                 byte[]data=i.getData();
-                                resp.setContentLength(data.length);
-                                resp.getOutputStream().write(data);
+                                response.setContentLength(data.length);
+                                response.getOutputStream().write(data);
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
-                        });
-                    } else {
-                        resp.setContentType("application/zip");
-                        try (ZipOutputStream zip = new ZipOutputStream(
-                                resp.getOutputStream())) {
-                            int len=0;
-                            int idx = 0;
-                            for (Image img : images) {
-                                ZipEntry entry = new ZipEntry(img.isMain() ? "main" : String.valueOf(idx++));
-                                zip.putNextEntry(entry);
-                                byte[] data=img.getData();
-                                len+=data.length;
-                                zip.write(data);
-                            }
-                            zip.finish();
-                            resp.setContentLength(len);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
+                        } else {
+                            response.setContentType("application/octet-stream");
+                            ByteArrayOutputStream tmp = new ByteArrayOutputStream();
+                            ZipOutputStream zip = new ZipOutputStream(
+                                    tmp);
+                                int len=0;
+                                int idx = 0;
+                                for (Image img : images) {
+                                    String entryName ="image"  +( img.isMain() ? "Main" : String.valueOf(idx++)) + ".jpg";
+                                    zip.putNextEntry(new ZipEntry(entryName));
+                                    byte[] data=img.getData();
+                                    zip.write(data);
+                                    zip.closeEntry();
+                                }
+                                zip.finish();
+                                zip.close();
+                                response.setContentLength(tmp.size());
+                                response.getOutputStream().write(tmp.toByteArray());
+                                response.getOutputStream().close();
                         }
+                    } catch (IOException e) {
+                        e.printStackTrace(System.err);
+                        throw new RuntimeException(e);
+                    } finally {
+                        asyncContext.complete();
                     }
                 });
             }
@@ -115,95 +129,53 @@ public class    ProductServlet extends ApiServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        String pathInfo=req.getPathInfo();
-        int productId=extractResourceId(pathInfo, 1);
-        Customer customer = (Customer) req.getSession().getAttribute(Customer.class.getSimpleName());
-        if (pathInfo.matches(".*/rating$")){
-            try {
-                Rating rating = ratingReader.readValue(req.getReader());
-                if (rating.getFirstName() == null | rating.getLastName() == null) {
-                    if (customer.getEmail()==null) {
-                        resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                        return;
-                    } else {
-                        rating.setFirstName(customer.getFirstName());
-                        rating.setLastName(customer.getLastName());
-                    }
-                }
-                rating.setProduct(new Product(productId));
-                rating.setCustomer(customer);
-                rating= dbContext.save(rating);
-                resp.setStatus(HttpServletResponse.SC_CREATED);
-                resp.setHeader("Location", req.getContextPath() + req.getServletPath() +"product/" +productId + "/rating/" + rating.getId());
-            } catch (SQLException e) {
-                if (e.getErrorCode()==1062) resp.setStatus(HttpServletResponse.SC_CONFLICT);
-                else throw new RuntimeException(e);
-            }
-        } else if (pathInfo.matches(".*/rating/\\d+/vote")){
-            int ratingId= extractResourceId(pathInfo, 2);
-            try {
-                boolean vote_= req.getParameter("up")!=null;
-                RatingVote vote=new RatingVote();
-                vote.setVote(vote_?RatingVote.VoteType.UP:RatingVote.VoteType.DOWN);
-                vote.setRating(new Rating(ratingId));
-                vote.setCustomer(customer);
-                dbContext.save(vote);
-                resp.setStatus(HttpServletResponse.SC_CREATED);
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
+        if (req.getSession().getAttribute("Seller") == null) {
+            resp.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
         }
+        Product product= jsonMapper.readValue(req.getReader(), Product.class);
+        if (product.getOriginalPrice()==null || product.getTitle()==null) {
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            return;
+        }
+        product.setSeller((Seller) req.getSession().getAttribute(Seller.class.getSimpleName()));
+        product.setId(0);
+        product.setDateAdded(null);
+        try {
+            dbContext.save(product);
+        } catch (SQLException e) {
+            e.printStackTrace(System.err);
+            throw new RuntimeException(e);
+        }
+        resp.setHeader("Location",getServletContext().getContextPath()+ "/"+ ErrandBoy.toRestLink(product));
     }
 
     @Override
     protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        String pathInfo=req.getPathInfo();
-        int productId=extractResourceId(pathInfo, 1);
-        int ratingId=extractResourceId(pathInfo, 2);
-        Customer customer=(Customer) req.getSession().getAttribute(Customer.class.getSimpleName());
-        if (pathInfo.matches(".*/rating/\\d+")){
-            try {
-                Rating newRating= ratingReader.readValue(req.getReader());
-                Rating oldRating=dbContext.findById(Rating.class,ratingId);
-                if(oldRating==null) {
-                    resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                    return;
-                }
-                if(oldRating.getCustomer().getId()!=customer.getId()) {
-                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    return;
-                }
-                    oldRating.setComment(newRating.getComment());
-                    oldRating.setRating(newRating.getRating());
-                    dbContext.save(oldRating);
-                }catch (SQLException e) {
-                throw new RuntimeException(e);
+        Seller seller;
+        int productId= Integer.parseInt(req.getParameter("productId"));
+        if ((seller= (Seller) req.getSession().getAttribute(Seller.class.getSimpleName()))== null) {
+            resp.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
+        Product product = jsonMapper.readValue(req.getReader(),Product.class);
+        Product oldProduct=dbContext.findById(Product.class, productId);
+        if (oldProduct==null || !oldProduct.getSeller().equals(seller)) {
+            resp.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        }
+        product.setSeller(seller);
+        product.setId(productId);
+        try {
+            dbContext.save(product);
+        }catch (SQLException e){
+            if (e.getSQLState().equals(SqlErrors.DUPLICATE_KEY.toString())){
+                resp.setStatus(HttpServletResponse.SC_CONFLICT);
+                return;
             }
         }
     }
 
-    @Override
-    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        String pathInfo=req.getPathInfo();
-        int ratingId=extractResourceId(pathInfo, 2);
-        Customer customer=getCustomer(req);
-        if(pathInfo.matches(".*/rating/\\d+$")){
-            Rating old= dbContext.findById(Rating.class,ratingId);
-            if(old.getCustomer().getId()!=customer.getId()){
-                resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                return;
-            }
-            dbContext.remove(new Rating(ratingId));
-            resp.setStatus(HttpServletResponse.SC_ACCEPTED);
-        } else if(pathInfo.matches(".*/rating/\\d+/vote")){
-            RatingVote old= dbContext.findById(RatingVote.class,new Rating(ratingId), customer);
-            if(old==null){
-                resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-            }
-            else
-                dbContext.remove(old);
-        }
-    }
     private static Object assignNumOrNull(Class<?> clazz, String value){
         Object val=null;
         try {
@@ -212,5 +184,9 @@ public class    ProductServlet extends ApiServlet {
                  IllegalAccessException | InvocationTargetException ignored){}
         return val;
     }
-    private static final Map<String, Class<?>> paramNames=Map.of("size",Integer.class,"page",Integer.class,  "title",String.class, "boughtHigh", BigDecimal.class,"boughtLow", BigDecimal.class,"discountedPriceHigh", BigDecimal.class,"discountedPriceLow", BigDecimal.class,"avgRatingHigh", BigDecimal.class,"avgRatingLow" , BigDecimal.class);
+    private static final Map<String, Class<?>> paramNames=new HashMap<>();
+    static {
+        paramNames.put(  "size",Integer.class);paramNames.put("page",Integer.class);paramNames.put( "title",String.class);paramNames.put("boughtHigh", BigDecimal.class);
+        paramNames.put("discountedPriceHigh", BigDecimal.class);paramNames.put("discountedPriceLow", BigDecimal.class);paramNames.put("avgRatingHigh", BigDecimal.class);paramNames.put("avgRatingLow" , BigDecimal.class);
+    }
 }

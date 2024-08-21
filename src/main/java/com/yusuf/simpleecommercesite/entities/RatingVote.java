@@ -2,8 +2,7 @@ package com.yusuf.simpleecommercesite.entities;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.yusuf.simpleecommercesite.entities.annotations.AggregateMember;
 import com.yusuf.simpleecommercesite.entities.annotations.Entity;
-import com.yusuf.simpleecommercesite.entities.annotations.Id;
-import com.yusuf.simpleecommercesite.entities.annotations.OneToOne;
+import javax.persistence.*;
 
 import java.io.Serializable;
 import java.util.Objects;
@@ -11,12 +10,14 @@ import java.util.Objects;
 @AggregateMember(in=Rating.class)
 public class RatingVote implements Serializable {
     @Id
-    @OneToOne(joinColumn = "ratingId")
+    @OneToOne(optional=false)
+            @Column(name = "ratingId")
      Rating rating;
      VoteType vote;
      @JsonIgnore
      @Id
-     @OneToOne(joinColumn = "customerId")
+     @OneToOne(optional=false)
+     @Column(name = "customerId")
      Customer customer;
     public enum VoteType {
         UP, DOWN

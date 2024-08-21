@@ -50,7 +50,7 @@ public class UserServlet extends ApiServlet {
             }
         }
         if (!ErrandBoy.validateCredentialFormat(customer.getEmail(), customer.getPassword())){
-            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Email should be a valid email format and password should contain numbers, lower and uppercase characters and be longer than 12 characters.");
             return;
         }
         try{
@@ -95,7 +95,7 @@ public class UserServlet extends ApiServlet {
         }
     }
     @Override
-    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    protected void doDelete(HttpServletRequest req, HttpServletResponse resp) {
         Customer customer = (Customer) req.getSession().getAttribute(Customer.class.getSimpleName());
         if (customer.getEmail()==null){
             resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

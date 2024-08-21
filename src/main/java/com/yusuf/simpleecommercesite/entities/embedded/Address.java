@@ -1,16 +1,14 @@
 package com.yusuf.simpleecommercesite.entities.embedded;
 
-import com.yusuf.simpleecommercesite.entities.annotations.Embedded;
-
+import javax.persistence.Embeddable;
 import java.util.Objects;
 
-@Embedded
+@Embeddable
 public class Address {
     public Address() {
     }
 
     String city;
-
     public Address(String city, String district, String street, String innerDoorNo, String buildingNo, String neighborhood) {
         this.city = city;
         this.district = district;

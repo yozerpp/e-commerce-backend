@@ -1,20 +1,20 @@
 package com.yusuf.simpleecommercesite.dbContext.sqlUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yusuf.simpleecommercesite.entities.annotations.Embedded;
-import com.yusuf.simpleecommercesite.entities.annotations.Entity;
-import com.yusuf.simpleecommercesite.entities.annotations.Id;
 import com.yusuf.simpleecommercesite.helpers.ErrandBoy;
-
+import com.yusuf.simpleecommercesite.entities.annotations.Entity;
+import javax.persistence.Embeddable;
+import javax.persistence.Id;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
-import java.sql.Blob;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.sql.*;
+import java.util.*;
 import java.util.Date;
-import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class SqlTypeConverter {
     private ObjectMapper mapper;
@@ -25,7 +25,6 @@ public class SqlTypeConverter {
     public SqlTypeConverter(ObjectMapper mapper) {
         this.mapper = mapper;
     }
-
     public <T> T convertToJavaType(Object val, Class<T> targetType) throws IOException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
         if (val==null) return null;
         else if (targetType.isEnum())
@@ -38,10 +37,19 @@ public class SqlTypeConverter {
         }
         else if (targetType.isAnnotationPresent(Entity.class))
             val = targetType.getConstructor(ensurePrimitive(val.getClass())).newInstance(val);
-        else if (targetType.isAnnotationPresent(Embedded.class) | List.class.isAssignableFrom(targetType) | targetType.isArray())
+        else if (Array.class.isAssignableFrom(val.getClass())){
+            try {
+                val = Arrays.stream(((Object[])((Array)val).getArray())).collect(Collectors.toList());
+            } catch (SQLException e) { throw new RuntimeException(e); }
+        }
+        else if (targetType.isAnnotationPresent(Embeddable.class) | List.class.isAssignableFrom(targetType) | targetType.isArray())
             val = (this.mapper != null ? this.mapper.readerFor(targetType).readValue(new StringReader((String) val)) : null);
         else if(targetType.isPrimitive() && val instanceof Number)
-            val= ((Number)val).intValue();
+           val = Number.class.getDeclaredMethod(targetType.getSimpleName() + "Value").invoke((Number)val);
+        else if(BigDecimal.class.isAssignableFrom(targetType) && val instanceof Number)
+            val = BigDecimal.valueOf(((Number)val).doubleValue());
+        else if (BigInteger.class.isAssignableFrom(targetType) && val instanceof Number)
+            val = BigInteger.valueOf(((Number)val).longValue());
         return (T) val;
     }
     private static byte[] convertBlobToByteArr(Object val) {
@@ -66,26 +74,30 @@ public class SqlTypeConverter {
 
     public Object convertToSqlType(Object value, Connection connection) {
         if (value==null) return null;
-        else if (value.getClass().isEnum())
-            return value.toString();
-        else if (value instanceof byte[])
-            return connection != null ? convertByteArrToBlob(value, connection) : null;
+//        else if (value instanceof byte[])
+//            return connection != null ? convertByteArrToIS(value) : null;
         else if(value instanceof Date){
             return new Timestamp(((Date) value).getTime());
+        } else if (value.getClass().isEnum()){
+            return value.toString();
         }
         else if (value.getClass().isAnnotationPresent(Entity.class))
             return convertEntityToPrimitive(value);
-        else if (value.getClass().isAnnotationPresent(Embedded.class) | value instanceof List | value.getClass().isArray())
+        else if (value.getClass().isAnnotationPresent(Embeddable.class))
             return this.mapper != null ? convertObjectToString(value, this.mapper) : null;
-        else if(value.getClass().isArray()) return List.of((Object[]) value);
+        else if(value instanceof List || value instanceof Set ||(value.getClass().isArray() && !value.getClass().getComponentType().isPrimitive())){
+            Stream<Object> stream;
+            if (value.getClass().isArray())
+                stream = Arrays.stream((Object[]) value);
+            else stream=((Collection<Object>) value).stream();
+            return '{'+ stream.map(Object::toString).collect(Collectors.joining(",")) + '}';
+        }
         else return value;
     }
 
     private Object convertEntityToPrimitive(Object value) {
         try {
-            Class<?> clazz=value.getClass();
-            if (clazz.getSimpleName().contains("$$"))
-                clazz=clazz.getSuperclass();
+            Class<?> clazz=ErrandBoy.getRealClass(value);
             for (Field field : clazz.getDeclaredFields()) {
                 if (field.isAnnotationPresent(Id.class)) {
                     return convertToSqlType(value.getClass().getDeclaredMethod("get" + ErrandBoy.firstLetterToUpperCase(field.getName())).invoke(value), null);

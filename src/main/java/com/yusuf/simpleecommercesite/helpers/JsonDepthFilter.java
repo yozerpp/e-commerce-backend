@@ -6,8 +6,8 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.ser.PropertyWriter;
 import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
 import com.yusuf.simpleecommercesite.entities.annotations.Entity;
-import com.yusuf.simpleecommercesite.entities.annotations.Id;
 
+import javax.persistence.*;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
@@ -36,8 +36,7 @@ public class JsonDepthFilter extends SimpleBeanPropertyFilter {
         if (depth <= maxDepth) {
             writer.serializeAsField(pojo, gen, provider);
         }
-        else {
-            if(pojo.getClass().isAnnotationPresent(Entity.class)) {
+        else if(pojo.getClass().isAnnotationPresent(Entity.class)) {
                 Map<String, Object> fields = new HashMap<>();
                 ErrandBoy.getAnnotatedFields(pojo.getClass(), Id.class).stream().map(field1 -> field1.getName()).filter(fieldName -> fieldName.equals(writer.getFullName().getSimpleName())).forEach(fieldName -> {
                     try {
@@ -49,5 +48,4 @@ public class JsonDepthFilter extends SimpleBeanPropertyFilter {
                 });
             }
         }
-    }
 }

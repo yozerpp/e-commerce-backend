@@ -1,8 +1,13 @@
 package com.yusuf.simpleecommercesite.helpers;
 
+import javax.persistence.Id;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ErrandBoy {
     private static final Map<Class<?>,Map<Class<? extends Annotation>, List<Field>>> fieldCache=new HashMap<>();
@@ -12,6 +17,16 @@ public class ErrandBoy {
         String string= String.copyValueOf(chars);
         string=str.equals("Integer")?str.replace("eger", ""):string;
         return string;
+    }
+    public static String toRestLink (Object entity){
+        Class<?> entityClass = getRealClass(entity);
+         return getAnnotatedFields(entityClass, Id.class).stream().sorted(Comparator.comparing(Field::getName)).map(field -> {
+            try {
+                return findGetter(field, entityClass).invoke(entity);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                throw new RuntimeException(e);
+            }
+        }).reduce(new StringBuilder(entityClass.getSimpleName()),(str, id)->((StringBuilder) str).append('/').append(id)).toString().toLowerCase(Locale.ENGLISH);
     }
     public static String firstLetterToLowerCase(String str){
         char[] chars=str.toCharArray();
@@ -45,7 +60,9 @@ public class ErrandBoy {
         fields=new ArrayList<>();
         for (Field field:clazz.getDeclaredFields())
             if (field.isAnnotationPresent(annotation)) fields.add(field);
-        fieldCache.put(clazz, Map.of(annotation, fields));
+        Map<Class<? extends Annotation>,List<Field> > map = new HashMap<>();
+        map.put(annotation,fields);
+        fieldCache.put(clazz, map);
         return fields;
     }
     private static List<Field> getFromCache(Class<?> clazz, Class<? extends Annotation> annotation){
@@ -53,5 +70,23 @@ public class ErrandBoy {
         if (fieldMap!=null)
             return fieldMap.get(annotation);
         else return null;
+    }
+
+    public static Method findGetter(Field field, Class<?> clazz){
+        String pre;
+       if (boolean.class.isAssignableFrom(field.getType())){
+           pre="is";
+       } else pre="get";
+        try {
+            return clazz.getDeclaredMethod(pre + firstLetterToUpperCase(field.getName()));
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Method findSetter(Field field, Class<?> clazz){
+        return Arrays.stream(clazz.getDeclaredMethods())
+                .filter(method -> method.getName().matches("^(set)" + firstLetterToUpperCase(field.getName())))
+                .findFirst().orElse(null);
     }
 }

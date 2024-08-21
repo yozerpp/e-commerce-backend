@@ -1,10 +1,13 @@
 package com.yusuf.simpleecommercesite.dbContext.sqlUtils;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 public class StatementBuilder{
     private static final String exceptionMessage = "METHOD AND INITIALIZED STATEMENT TYPE IS INCOMPATIBLE";
@@ -21,7 +24,7 @@ public class StatementBuilder{
     private final List<Object> lastParams = new ArrayList<>();
     private final StringBuilder end = new StringBuilder();
     private final StringBuilder order=new StringBuilder();
-    private final List<Object> values = new ArrayList<>();
+    private final StringBuilder groupBy=new StringBuilder();
     private String[] insertColumnBuf=new String[0];
     public static PreparedStatement distinct(String tableName, String columnName, Connection connection) throws SQLException {
        PreparedStatement statement= connection.prepareStatement("SELECT DISTINCT "+ "?" + " FROM " + tableName);
@@ -45,6 +48,29 @@ public class StatementBuilder{
         firstHalf.append(columnName).append("=?");
         firstParams.add(value);
         return this;
+    }
+    public void reset(String... clausesToKeep){
+        Stream<String> clauses=clausesToKeep!=null? Arrays.stream(clausesToKeep): null;
+        if ( clauses==null||clauses.noneMatch(clause-> Objects.equals(clause, "SELECT") || Objects.equals(clause, "UPDATE") || Objects.equals(clause, "DELETE") || Objects.equals(clause, "INSERT"))) {
+            firstHalf.delete(0, firstHalf.length());
+            firstParams.clear();
+            firstAppendFirstHalf=true;
+            groupBy.delete(0, groupBy.length());
+            end.delete(0, end.length());
+            order.delete(0, order.length());
+        }
+        clauses=clausesToKeep!=null? Arrays.stream(clausesToKeep): null;
+        if(clauses==null|| clauses.noneMatch(clause-> Objects.equals(clause, "WHERE") || Objects.equals(clause, "VALUES"))){
+            lastHalf.delete(0, lastHalf.length());
+            lastParams.clear();
+            firstAppendLastHalf=true;
+        }
+        clauses=clausesToKeep!=null? Arrays.stream(clausesToKeep): null;
+        if (clauses==null || clauses.noneMatch(clause-> Objects.equals(clause, "GROUP BY") || Objects.equals(clause, "ORDER BY") || Objects.equals(clause, "LIMIT")||  Objects.equals(clause, "OFFSET"))){
+            order.delete(0, order.length());
+            groupBy.delete(0, groupBy.length());
+            end.delete(0, end.length());
+        }
     }
     public StatementBuilder where(String columName, Object value, String... operator) {
         if (isNotProcessed(value))
@@ -72,6 +98,12 @@ public class StatementBuilder{
             lastHalf.append(columName).append(op).append("? ");
             lastParams.add(value);
         }
+        return this;
+    }
+    public StatementBuilder groupBy(String columnName){
+        if (groupBy.length()==0) groupBy.append(" GROUP BY ");
+        else groupBy.append(", ");
+        this.groupBy.append(columnName);
         return this;
     }
     public StatementBuilder columns(String... columNames) {
@@ -105,7 +137,8 @@ public class StatementBuilder{
             set(columnName, value);
         else if (type == StatementType.SELECT){
             columns(columnName);
-            if(!lastHalf.toString().contains(columnName)) where(columnName, value);
+            if((!isNotProcessed(value) || includeDefaults) && !lastHalf.toString().contains(columnName))
+                where(columnName, value);
         }
         else if (type == StatementType.INSERT)
             columns(columnName).values(value);
@@ -114,33 +147,49 @@ public class StatementBuilder{
     public StatementBuilder table(String tableName){this.tableName=tableName; return this;}
     public PreparedStatement build(Connection connection) {
         final String sql;
+        if (type==StatementType.INSERT && (lastParams.isEmpty() && firstParams.isEmpty())) {
+            firstHalf.delete(0,firstHalf.length());
+            lastHalf.delete(0,lastHalf.length());
+            end.delete(0,end.length());
+            lastHalf.append(" default values");
+        }
         if (type == StatementType.SELECT)
-            sql = command + (firstHalf.isEmpty() ? " * " : firstHalf.toString()) +" FROM " + tableName + lastHalf + order + (end.isEmpty()?" LIMIT 0,20 ":end);
-        else sql = command + tableName + firstHalf + lastHalf + end;
+            sql = command + (firstHalf.length()==0 ? " * " : firstHalf.toString()) +" FROM " + tableName + lastHalf +groupBy + order + (end.length()==0?" LIMIT 20 OFFSET 0 ":end);
+        else sql = command + tableName + firstHalf + lastHalf+  end;
         try {
             PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             int i = 1;
-            for (Object value : firstParams) statement.setObject(i++, value);
-            for (Object value : lastParams) statement.setObject(i++, value);
+            for (int j=0; j<2; j++) {
+                List<Object> params = j==0?firstParams:lastParams;
+                for (Object value : params) {
+                    if (value != null && (value.getClass().isEnum() ||String.class.isAssignableFrom( value.getClass()) && ((String) value).contains("{")) )
+                        statement.setObject(i++, value.toString(), Types.OTHER);
+                    else if (value != null && byte[].class.isAssignableFrom(value.getClass()))
+                        statement.setBinaryStream(i++, new ByteArrayInputStream((byte[]) value), ((byte[]) value).length);
+                    else statement.setObject(i++, value);
+                }
+            }
             return statement;
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
     }
     private boolean isNotProcessed(Object value){
-        return (value==null ||  Objects.equals(value, 0) || Objects.equals(value, BigDecimal.ZERO)|| Objects.equals(value, false)) && !this.includeDefaults;
+        return (value==null ||  Objects.equals(value, 0) || Objects.equals(value, 0.0)|| Objects.equals(value, BigDecimal.ZERO)|| Objects.equals(value, false)) && !this.includeDefaults;
     }
     public StatementBuilder retrieve(String... columNames){
-        this.retrievedColumns.addAll(List.of(columNames));
+        this.retrievedColumns.addAll(Arrays.asList(columNames));
         return this;
     }
     public StatementBuilder page(int page, int pageSize) {
         page = page * pageSize;
-        end.append(" LIMIT ").append(page).append(", ").append(pageSize);
+        end.append(" LIMIT ").append((page+1) * pageSize).append(" OFFSET ").append((page)*pageSize);
         return this;
     }
     public StatementBuilder order(String columnName, boolean descending) {
-        order.append(" ORDER BY ").append(columnName).append(" ").append(descending?"DESC":"ASC");
+        if (order.length()==0) order.append(" ORDER BY ");
+        else order.append(", ") ;
+        order.append(columnName).append(" ").append(descending?"DESC ":"ASC ");
         return this;
     }
 

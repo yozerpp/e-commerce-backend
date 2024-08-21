@@ -4,7 +4,6 @@ return
 }
 $file=Get-Item -Path $args[0]
 $outputPath=$args[1]
-Write-Output "$outputPath"
 $config= @{
 Method= 'POST'
 Uri= "https://file.io/"
@@ -25,4 +24,4 @@ if ($null -eq $resp){
 }
 Write-Output "uploaded the file"
 $arg=$resp.link
-ssh root@localhost -p 22 "./redeploy.sh $arg $outputPath"
+ssh root@213.142.157.170 -p 22 "./redeploy.sh $arg $outputPath"

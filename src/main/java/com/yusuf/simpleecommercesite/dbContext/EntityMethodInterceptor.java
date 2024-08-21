@@ -1,8 +1,6 @@
 package com.yusuf.simpleecommercesite.dbContext;
 
-import com.yusuf.simpleecommercesite.entities.annotations.Id;
-import com.yusuf.simpleecommercesite.entities.annotations.OneToMany;
-import com.yusuf.simpleecommercesite.entities.annotations.OneToOne;
+import javax.persistence.*;
 import com.yusuf.simpleecommercesite.helpers.ErrandBoy;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
@@ -40,7 +38,7 @@ public class EntityMethodInterceptor implements MethodInterceptor {
         String fieldName=getFieldName(method.getName());
         if(method.getName().startsWith("set")){
             context.addDirtyField(target, fieldName); // Saves name of the field to the map.
-        } else if (method.getName().startsWith("get") | method.getName().startsWith("is")){
+        } else if (method.getName().startsWith("get") || method.getName().startsWith("is")){
             Field field=target.getClass().getDeclaredField(fieldName);
             Class<?> fieldType=method.getReturnType();
             if(field.isAnnotationPresent(OneToOne.class)){
@@ -52,12 +50,13 @@ public class EntityMethodInterceptor implements MethodInterceptor {
 //            else if (List.class.isAssignableFrom(fieldType) &&
 //                    ( (fieldType= (Class<?>)((ParameterizedType) method.getGenericReturnType()).getActualTypeArguments()[0])).isAnnotationPresent(Entity.class)){
             else if(field.isAnnotationPresent(OneToMany.class))    {
-                String inverseJoinCol=field.getAnnotation(OneToMany.class).inverseJoinColumn();
+                String inverseJoinCol=field.getAnnotation(OneToMany.class).mappedBy();
                 fieldType= (Class<?>)((ParameterizedType) method.getGenericReturnType()).getActualTypeArguments()[0];
-            retVal=context.search(fieldType, Map.of(inverseJoinCol, this.targetId.values().stream().findFirst().get()));
+                Map<String, Object> params = new HashMap<>();
+                params.put(inverseJoinCol, this.targetId.values().stream().findFirst().get());
+                retVal=context.search(fieldType, params ).getData();
                 if (retVal!=null) this.target.getClass().getMethod("set"+ErrandBoy.firstLetterToUpperCase(getFieldName(method.getName())), List.class).invoke(this.target, retVal);
-                else retVal=List.of();
-            } else if (byte[].class.isAssignableFrom(fieldType) | char[].class.isAssignableFrom(fieldType)){
+            } else if (byte[].class.isAssignableFrom(fieldType) || char[].class.isAssignableFrom(fieldType)){
                 retVal=method.invoke(context.fetchLOb(target, getFieldName(method.getName())), args);
             }
         }

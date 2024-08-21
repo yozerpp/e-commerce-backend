@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.yusuf.simpleecommercesite.entities.Cart;
 import com.yusuf.simpleecommercesite.entities.Invoice;
 import com.yusuf.simpleecommercesite.entities.Customer;
+import com.yusuf.simpleecommercesite.helpers.ErrandBoy;
+import com.yusuf.simpleecommercesite.network.dtos.SearchResult;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -11,9 +13,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static com.yusuf.simpleecommercesite.network.servlets.ApiServlet.apiRoot;
 
@@ -33,10 +37,13 @@ public class InvoiceServlet extends ApiServlet {
             resp.sendError(HttpServletResponse.SC_BAD_REQUEST);
             return;
         }
-        List<Invoice> results= dbContext.search(Invoice.class, Map.of("email",email));
+        Map<String, Object> params = new HashMap<>();
+        params.put("email", email);
+        SearchResult<Invoice> results= dbContext.search(Invoice.class, params);
+        if (results==null) resp.sendError(HttpServletResponse.SC_NOT_FOUND);
         if(req.getParameter("email")==null)
-            results=results.stream().filter(invoice -> invoice.getCustomer().getEmail()==null).toList();
-        if (results.isEmpty())
+            results.setData(results.getData().stream().filter(invoice -> invoice.getCustomer().getEmail()==null).collect(Collectors.toList()));
+        if (results.getData().isEmpty())
             resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
         else{
             resp.setContentType("application/json");
@@ -48,9 +55,10 @@ public class InvoiceServlet extends ApiServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         Invoice invoice=invoiceReader.readValue(req.getReader());
         Customer customer=(Customer) req.getSession().getAttribute(Customer.class.getSimpleName());
-        if (customer.getEmail()!=null)
+        if (customer.getEmail()!=null) {
             invoice.setEmail(customer.getEmail());
-        else if (invoice.getEmail()==null){
+            if (invoice.getDeliveryAddress()==null) invoice.setDeliveryAddress(customer.getAddress());
+        }    else if (invoice.getEmail()==null){
             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             return;
         }
@@ -59,6 +67,7 @@ public class InvoiceServlet extends ApiServlet {
         try {
             dbContext.save(invoice);
             setNewCart(req,resp);
+            resp.setHeader("Location", contextPath + '/' +ErrandBoy.toRestLink(invoice));
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -89,7 +98,7 @@ public class InvoiceServlet extends ApiServlet {
             invoice.setId(invoiceId);
             dbContext.update(invoice, false);
         } catch (SQLException e) {
-            if (Objects.equals(e.getSQLState(), SqlErrors.INVOICE_COMPLETE.toString())) resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            if (Objects.equals(e.getSQLState(), SqlErrors.INVOICE_COMPLETE.toString())) resp.sendError(HttpServletResponse.SC_BAD_REQUEST);
             else throw new RuntimeException(e);
         }
     }

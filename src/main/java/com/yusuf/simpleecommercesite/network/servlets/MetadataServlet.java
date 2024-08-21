@@ -1,7 +1,9 @@
 package com.yusuf.simpleecommercesite.network.servlets;
 
+import com.yusuf.simpleecommercesite.entities.Customer;
 import com.yusuf.simpleecommercesite.entities.annotations.Metadata;
 import com.yusuf.simpleecommercesite.helpers.ErrandBoy;
+import com.yusuf.simpleecommercesite.network.dtos.SearchResult;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -20,7 +22,7 @@ import static com.yusuf.simpleecommercesite.network.servlets.ApiServlet.apiRoot;
 
 @WebServlet(urlPatterns = apiRoot + "/metadata/*", name = "Metadata",asyncSupported = true)
 public class MetadataServlet extends ApiServlet {
-    static final String classNamePrefix="com.may.simpleecommercesite.entities.";
+    static final String classNamePrefix= Customer.class.getPackage().getName();
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
@@ -35,7 +37,7 @@ public class MetadataServlet extends ApiServlet {
         if (Objects.equals(request, "types")) {
             Map<String, String> ret = new HashMap<>();
             try {
-                Class<?> cls = Class.forName( classNamePrefix +entity);
+                Class<?> cls = Class.forName( classNamePrefix + '.' +entity);
                 for (Field field : cls.getDeclaredFields()) {
                     String retS = getTypeNameWithParams(field);
 //                    TypeVariable<? extends Class<?>>[] typeparams= type.getTypeParameters();
@@ -49,9 +51,9 @@ public class MetadataServlet extends ApiServlet {
             }
         }else if(Objects.equals(request, "values")){
             try {
-                Class<?> cls = Class.forName(classNamePrefix+ entity);
+                Class<?> cls = Class.forName(classNamePrefix + '.'+ entity);
                 if (cls.isAnnotationPresent(Metadata.class)) {
-                    List<?> ret = dbContext.search(cls, Map.of());
+                    SearchResult<?> ret = dbContext.search(cls, null);
                     jsonMapper.writeValue(resp.getWriter(), ret);
                 } else {
                     resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);

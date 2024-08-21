@@ -15,7 +15,7 @@ public class AuthorizationFilter extends HttpFilter {
     @Override
     protected void doFilter(HttpServletRequest req, HttpServletResponse res, FilterChain chain) throws IOException, ServletException {
         if ((req.getSession().getAttribute(Customer.class.getSimpleName())!=null && ((Customer)req.getSession().getAttribute(Customer.class.getSimpleName())).getEmail()!=null ) ||
-                (Objects.equals(req.getServletPath(), "/api/user") && Objects.equals(req.getMethod(), "POST"))){
+                (Objects.equals(req.getServletPath(), "/user") && Objects.equals(req.getMethod(), "POST"))){
             chain.doFilter(req,res);
         } else res.setStatus(401);
     }

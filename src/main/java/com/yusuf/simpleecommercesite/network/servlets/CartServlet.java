@@ -1,7 +1,6 @@
 package com.yusuf.simpleecommercesite.network.servlets;
 
 import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.yusuf.simpleecommercesite.entities.*;
 
 import javax.servlet.ServletException;
@@ -10,8 +9,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Objects;
@@ -41,40 +40,46 @@ public class CartServlet extends ApiServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         Cart cart = getCart(req.getSession());
+        Sale newSale;
+        Product product;
+        char[] body= new char[req.getContentLength()];
+        if (req.getReader().read(body)>0) {
+            product = null;
+            newSale= saleReader.readValue(req.getReader());
+        } else if(req.getParameter("increment") != null && req.getParameter(Product.class.getSimpleName().toLowerCase()) != null){
+            boolean increment = Boolean.parseBoolean(req.getParameter("increment"));
+            product = new Product(Integer.parseInt(req.getParameter(Product.class.getSimpleName().toLowerCase())));
+            newSale = cart.getSales().stream().filter(sale -> sale.getProduct() == product).findFirst().orElse(new Sale(product, cart));
+            newSale.setQuantity(newSale.getQuantity().add (BigInteger.valueOf(increment ? 1 : -1)));
+            String couponCode=req.getParameter(Coupon.class.getSimpleName().toLowerCase());
+            if(couponCode!=null)
+                newSale.setCoupon(new Coupon(couponCode));
+        }else {
+            resp.sendError(HttpServletResponse.SC_BAD_REQUEST);
+            return;
+        }
+            newSale.setCart(cart);
+            newSale.setPrice(dbContext.findById(Product.class, newSale.getProduct().getId()).getTaxedPrice());
+            List<Sale> sales = cart.getSales();
+            sales.remove(newSale);
         try {
-            try  {
-                Sale newSale = saleReader.readValue(req.getReader());
-                newSale.setCart(cart);
-                newSale.setPrice(dbContext.findById(Product.class, newSale.getProduct().getId()).getFinalPrice());
-                List<Sale> sales = cart.getSales();
-                sales.remove(newSale);
-                dbContext.save(newSale);
-                sales.add(newSale);
-                cart.setSales(sales);
-                cart.setTotal(cart.getTotal().add(newSale.getPrice().multiply(BigDecimal.valueOf(newSale.getQuantity()))));
-            } catch (MismatchedInputException e) {
-                if (req.getParameter("increment") != null && req.getParameter(Product.class.getSimpleName().toLowerCase()) != null) {
-                    boolean increment = Boolean.parseBoolean(req.getParameter("increment"));
-                    Product product = new Product(Integer.parseInt(req.getParameter(Product.class.getSimpleName().toLowerCase())));
-                    String couponCode=req.getParameter(Coupon.class.getSimpleName().toLowerCase());
-                    Sale newSale = cart.getSales().stream().filter(sale -> sale.getProduct() == product).findFirst().orElseGet(() -> new Sale(product, cart));
-                    newSale.setQuantity(newSale.getQuantity() + (increment ? 1 : -1));
-                    if(couponCode!=null)
-                        newSale.setCoupon(new Coupon(couponCode));
-                    dbContext.save(newSale);
-                } else {
-                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                }
-            }
-        }catch (SQLException e){
+            dbContext.save(newSale);
+        } catch (SQLException e) {
             if(e.getSQLState().equals(SqlErrors.CART_ORDERED.toString())) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             }else if(e.getSQLState().equals(SqlErrors.COUPON_OWNER_MISMATCH.toString())){
                 resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
+            }else if (e.getSQLState().equals(SqlErrors.COUPON_EXPIRED.toString())){
+                resp.sendError(HttpServletResponse.SC_FORBIDDEN);
             }else {
+                e.printStackTrace(System.err);
                 throw new RuntimeException(e);
             }
+            return;
         }
+        sales.add(newSale);
+        cart.setSales(sales);
+        cart.setTotal(cart.getTotal().add(newSale.getPrice().multiply(BigDecimal.valueOf(newSale.getQuantity().longValue()))));
        }
 //    private void addToCart(Sale newSale, Cart cart) {
 //        newSale.setCart(cart);
@@ -115,7 +120,7 @@ public class CartServlet extends ApiServlet {
     @Override
     protected void doDelete(HttpServletRequest req, HttpServletResponse resp) {
         Cart cart = getCart(req.getSession());
-        dbContext.remove(cart);
+        if (cart!=null)dbContext.remove(cart);
         try {
             setNewCart(req,resp);
         } catch (SQLException e) {

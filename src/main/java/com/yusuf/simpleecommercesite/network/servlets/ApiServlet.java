@@ -2,12 +2,11 @@ package com.yusuf.simpleecommercesite.network.servlets;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yusuf.simpleecommercesite.entities.annotations.Cookie;
-import com.yusuf.simpleecommercesite.entities.annotations.Entity;
 import com.yusuf.simpleecommercesite.dbContext.DbContext;
 import com.yusuf.simpleecommercesite.entities.Cart;
 import com.yusuf.simpleecommercesite.entities.Customer;
 import com.yusuf.simpleecommercesite.helpers.ErrandBoy;
-
+import javax.persistence.Entity;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -20,17 +19,18 @@ import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 
 public abstract class ApiServlet extends HttpServlet {
     //    protected Integer activeRequest=0;
     public static final String apiRoot ="";
+    protected static final String contextPath = System.getenv("SERVER_URL");
     protected volatile boolean destroying;
     protected static final int maxThreads = 150;
     protected final Semaphore activeRequest = new Semaphore(maxThreads);
     protected DbContext dbContext;
     protected ObjectMapper jsonMapper;
-
     @Override
     public void init() throws ServletException {
         super.init();
@@ -81,7 +81,9 @@ public abstract class ApiServlet extends HttpServlet {
         }
         super.destroy();
     }
-
+    public static Map<String,Object> getParams(HttpServletRequest request){
+       return request.getParameterMap().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e->e.getValue()[0]));
+    }
     public static javax.servlet.http.Cookie createGlobalCookie(String name, String value) {
         javax.servlet.http.Cookie cookie = new javax.servlet.http.Cookie(name, value);
         cookie.setMaxAge(24 * 60 * 60 * 14);
@@ -128,7 +130,7 @@ public abstract class ApiServlet extends HttpServlet {
     }
 
     protected static int extractResourceId(String path, int index) {
-        Matcher matcher = Pattern.compile("/(\\d+)(/.*/(\\d+))?").matcher(path);
+        Matcher matcher = Pattern.compile("^/(\\d+)(/.*/(\\d+))?").matcher(path);
 //        for (int i=0 ; i<index; i++)
         matcher.find();
         return Integer.parseInt(matcher.group(index > 1 ? index + 1 : index));
@@ -152,14 +154,17 @@ public abstract class ApiServlet extends HttpServlet {
                         cookie.setValue(getCookieValue(cart));
                         resp.addCookie(cookie);
                     });
-            req.removeAttribute(Cart.class.getSimpleName());
+            req.getSession().removeAttribute(Cart.class.getSimpleName());
             req.getSession().setAttribute(Cart.class.getSimpleName(), cart);
     }
+
     enum SqlErrors{
-        CART_ORDERED(45002),
-        INVOICE_COMPLETE(45003),
-        OMITTED_REQUIRED_CREDENTIAL(23502),
-        COUPON_OWNER_MISMATCH(45005)
+        DUPLICATE_KEY(23505),
+        CART_ORDERED(22002),
+        INVOICE_COMPLETE(22004),
+        OMITTED_REQUIRED_CREDENTIAL(22001),
+        COUPON_OWNER_MISMATCH(22003),
+        COUPON_EXPIRED(22005)
         ;
         private Integer SqlState;
         SqlErrors(int state){

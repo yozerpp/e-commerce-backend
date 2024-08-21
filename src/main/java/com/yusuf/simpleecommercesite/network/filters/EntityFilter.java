@@ -13,10 +13,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
+import static com.yusuf.simpleecommercesite.network.filters.CookieFilter.cookieClasses;
+
 @WebFilter(servletNames = {"Cart", "Invoice", "User", "Login", "Product"} , filterName = "Entity", asyncSupported = true)
 public class EntityFilter extends HttpFilter {
     DbContext dbContext;
-    private static final Class<?>[] cookieClasses={Cart.class, Customer.class};
     @Override
     public void init() throws ServletException {
         super.init();

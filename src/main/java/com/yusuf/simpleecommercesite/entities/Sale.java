@@ -3,36 +3,44 @@ package com.yusuf.simpleecommercesite.entities;
 import com.fasterxml.jackson.annotation.JsonFilter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.yusuf.simpleecommercesite.entities.annotations.Entity;
-import com.yusuf.simpleecommercesite.entities.annotations.Id;
-import com.yusuf.simpleecommercesite.entities.annotations.ManyToOne;
-import com.yusuf.simpleecommercesite.entities.annotations.OneToOne;
 
+import javax.annotation.Generated;
+import javax.persistence.*;
+import javax.validation.constraints.Max;
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Objects;
 @Entity
 public class Sale implements Serializable {
      @Id
-     @ManyToOne(joinColumn = "cartId")
+     @ManyToOne
      @JsonIgnore
      @JsonFilter("depth_4")
+     @Column(name = "cartId")
      private Cart cart;
     @Id
-     @OneToOne(joinColumn = "productId")
+     @OneToOne
+             (optional = false)
+    @Column(name = "productId")
      @JsonFilter("depth_4")
      private Product product;
-    @ManyToOne(joinColumn = "couponId")
+    @ManyToOne
+    @Column(name = "couponId")
      @JsonFilter("depth_4")
+    @GeneratedValue
      private Coupon coupon;
-     private int quantity;
+    private @Max(100) BigInteger quantity;
+     @GeneratedValue
      private java.math.BigDecimal price;
+     @GeneratedValue
      private BigDecimal finalTotal;
     public Sale() {
     }
     public Sale (Product product, Cart cart){
         this(product);
         this.cart=cart;
-        this.quantity=1;
+        this.quantity=BigInteger.ONE;
     }
     public Sale(Product product){
         this.product = product;
@@ -70,11 +78,11 @@ public class Sale implements Serializable {
     }
 
     
-    public int getQuantity() {
+    public @Max(100) BigInteger getQuantity() {
         return quantity;
     }
 
-    public void setQuantity( int quantity) {
+    public void setQuantity(@Max(100) BigInteger quantity) {
         this.quantity = quantity;
     }
 
